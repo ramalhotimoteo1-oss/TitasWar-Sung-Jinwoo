@@ -1,6 +1,5 @@
 #!/bin/sh
 # shellcheck disable=SC2034
-# Function to define color codes for terminal output
 colors() {
     BLACK_BLACK='\033[00;30m'
     BLACK_CYAN='\033[01;36m\033[01;07m'
@@ -30,50 +29,41 @@ script_slogan() {
 
 language_setup() {
     CONFIG_FILE="$TMP/config.cfg"
-
     LANGUAGE=`grep -E "^LANGUAGE=" "$CONFIG_FILE" 2>/dev/null | cut -d '=' -f2`
-
     if [ -z "$LANGUAGE" ]; then
         LANGUAGE="en"
         echo "LANGUAGE=$LANGUAGE" >> "$CONFIG_FILE"
     fi
-
     export LANGUAGE
 }
 language_setup
 
-# Funcao para imprimir com printf, usando traducao e cores
 printf_t() {
-  local_text="$1"
-  local_color_start="$2"
-  local_color_end="$3"
-  local_emoji_position="$4"
-  local_emoji="$5"
-
-  local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
-
-  if [ "$local_emoji_position" = "before" ]; then
-    printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
-  else
-    printf "${local_color_start}%s %s${local_color_end}" "$local_translated_text" "$local_emoji"
-  fi
+    local_text="$1"
+    local_color_start="$2"
+    local_color_end="$3"
+    local_emoji_position="$4"
+    local_emoji="$5"
+    local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
+    if [ "$local_emoji_position" = "before" ]; then
+        printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
+    else
+        printf "${local_color_start}%s %s${local_color_end}" "$local_translated_text" "$local_emoji"
+    fi
 }
 
-# Funcao para imprimir com echo, usando traducao e cores
 echo_t() {
-  local_text="$1"
-  local_color_start="$2"
-  local_color_end="$3"
-  local_emoji_position="$4"
-  local_emoji="$5"
-
-  local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
-
-  if [ "$local_emoji_position" = "before" ]; then
-    printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
-  else
-    printf "${local_color_start}%s %s${local_color_end}\n" "$local_translated_text" "$local_emoji"
-  fi
+    local_text="$1"
+    local_color_start="$2"
+    local_color_end="$3"
+    local_emoji_position="$4"
+    local_emoji="$5"
+    local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
+    if [ "$local_emoji_position" = "before" ]; then
+        printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
+    else
+        printf "${local_color_start}%s %s${local_color_end}\n" "$local_translated_text" "$local_emoji"
+    fi
 }
 
 time_exit() {
@@ -92,8 +82,13 @@ time_exit() {
 }
 
 # Funcao central de requisicao via curl
+# Usa TMP_COOKIE se definido; caso contrario opera sem cookie (fase pre-login)
 run_curl() {
-    curl -s -L -A "$vUserAgent" -c "$TMP_COOKIE" -b "$TMP_COOKIE" "$@"
+    if [ -n "$TMP_COOKIE" ]; then
+        curl -s -L -A "$vUserAgent" -c "$TMP_COOKIE" -b "$TMP_COOKIE" "$@"
+    else
+        curl -s -L -A "$vUserAgent" "$@"
+    fi
 }
 
 # Acessa qualquer pagina pelo caminho relativo
@@ -132,13 +127,7 @@ messages_info() {
 
 player_stats() {
     fetch_page "/train"
-
     STRENGTH=`grep -o -E ': [0-9]+' "$TMP/SRC" | sed -n '1s/: //p'`
-    HEALTH=`grep -o -E '\(([0-9]+)\)' "$TMP/SRC" | sed '2s/: //p'`
-    AGILITY=`grep -o -E ': [0-9]+' "$TMP/SRC" | sed -n '3s/: //p'`
-    PROTECTION=`grep -o -E ': [0-9]+' "$TMP/SRC" | sed -n '4s/: //p'`
-
     PLAYER_STRENGTH=`echo "$STRENGTH" | tr -cd '[:digit:]'`
-
     echo "$PLAYER_STRENGTH"
 }
