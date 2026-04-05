@@ -16,7 +16,7 @@ update() {
 
     files_to_update=""
 
-    cd "$HOME/twm" || exit
+    cd "$TWMDIR" || exit
     . language.sh
     . info.sh
     load_config
@@ -26,8 +26,8 @@ update() {
     for script in $SCRIPTS; do
         remote_count=`curl -s -L "${SERVER}${script}" | wc -c`
 
-        if [ -e "$HOME/twm/$script" ]; then
-            local_count=`wc -c < "$HOME/twm/$script"`
+        if [ -e "$TWMDIR/$script" ]; then
+            local_count=`wc -c < "$TWMDIR/$script"`
         else
             local_count=0
         fi
@@ -55,7 +55,7 @@ update() {
             case "$choice" in
                 s|S|y|Y)
                     for file in $files_to_update; do
-                        curl -s -L "${SERVER}${file}" -o "$HOME/twm/$file"
+                        curl -s -L "${SERVER}${file}" -o "$TWMDIR/$file"
                         printf "Updated: %s\n" "$file"
                     done
                     ;;
@@ -77,6 +77,6 @@ update() {
     done
 
     # Converte de DOS para Unix
-    find "$HOME/twm" -type f -name '*.sh' -print0 | xargs -0 sed -i 's/\r$//' 2>/dev/null
-    chmod +x "$HOME/twm/"*.sh &
+    find "$TWMDIR" -type f -name '*.sh' -print0 | xargs -0 sed -i 's/\r$//' 2>/dev/null
+    chmod +x "$TWMDIR/"*.sh &
 }
