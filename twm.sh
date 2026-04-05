@@ -1,26 +1,33 @@
 #!/bin/sh
 # shellcheck disable=SC1091
 
-# Carrega info.sh primeiro (define colors, echo_t, printf_t, fetch_page, run_curl)
-. "$HOME/twm/info.sh"
+# TWMDIR: diretorio base do projeto
+# Exportado pelo play.sh; fallback para dirname do proprio twm.sh
+if [ -z "$TWMDIR" ]; then
+    TWMDIR=`cd "$(dirname "$0")" && pwd`
+    export TWMDIR
+fi
 
-# Carrega config global se existir (antes de saber o TMP da conta)
-if [ -f "$HOME/twm/config.cfg" ]; then
-    . "$HOME/twm/config.cfg"
+# Carrega info.sh primeiro (define colors, echo_t, printf_t, fetch_page, run_curl)
+. "$TWMDIR/info.sh"
+
+# Carrega config global se existir
+if [ -f "$TWMDIR/config.cfg" ]; then
+    . "$TWMDIR/config.cfg"
 fi
 
 colors
 language_setup
 
-RUN=`cat "$HOME/twm/runmode_file" 2>/dev/null || echo '-boot'`
+RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot'`
 
 # Termux wake lock
 if [ -d /data/data/com.termux/files/usr/share/doc ]; then
     termux-wake-lock 2>/dev/null
 fi
 
-# Carrega todas as bibliotecas com dot (.) — correto para sh no Termux
-cd "$HOME/twm" || exit
+# Carrega todas as bibliotecas com dot (.)
+cd "$TWMDIR" || exit
 for _lib in \
     language.sh \
     requeriments.sh \
@@ -49,15 +56,15 @@ for _lib in \
     function.sh \
     update_check.sh
 do
-    if [ -f "$HOME/twm/$_lib" ]; then
-        . "$HOME/twm/$_lib"
+    if [ -f "$TWMDIR/$_lib" ]; then
+        . "$TWMDIR/$_lib"
     else
         printf "WARNING: %s not found, skipping.\n" "$_lib"
     fi
 done
 unset _lib
 
-# Fallback de seguranca: se translate_and_cache nao foi carregada, define stub
+# Fallback: se translate_and_cache nao foi carregada, define stub
 type translate_and_cache > /dev/null 2>&1 || translate_and_cache() { echo "$2"; }
 
 script_slogan
@@ -80,7 +87,7 @@ func_unset() {
 }
 
 # Verifica se ha selecao previa de servidor
-if [ -f "$HOME/twm/ur_file" ] && [ -s "$HOME/twm/ur_file" ]; then
+if [ -f "$TWMDIR/ur_file" ] && [ -s "$TWMDIR/ur_file" ]; then
     printf "${GREEN_BLACK}Starting with last settings used.${COLOR_RESET}\n"
 
     for _i in 4 3 2 1; do
@@ -88,8 +95,8 @@ if [ -f "$HOME/twm/ur_file" ] && [ -s "$HOME/twm/ur_file" ]; then
         if read -r -t 1; then
             set_config "ALLIES" ""
             : > "$TMP/allies.txt"
-            : > "$HOME/twm/ur_file"
-            : > "$HOME/twm/fileAgent.txt"
+            : > "$TWMDIR/ur_file"
+            : > "$TWMDIR/fileAgent.txt"
             unset UR UA AL
             break
         fi
@@ -98,14 +105,13 @@ if [ -f "$HOME/twm/ur_file" ] && [ -s "$HOME/twm/ur_file" ]; then
     unset _i
 fi
 
-# Inicializa ambiente: config, servidor, proxy(no-op), login
+# Inicializa ambiente
 load_config
 requer_func
 func_proxy
 login_logoff
 
 # Apos login, TMP ja aponta para ~/.twm/${UR}_${ACC}
-# Configura aliados se nao estiver em modo caverna
 if [ "`get_config ALLIES`" = "" ] && [ "$RUN" != "-cv" ]; then
     conf_allies
     clear
