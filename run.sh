@@ -1,5 +1,5 @@
 twm_play() {
-    echo "$RUN" > "$HOME/twm/runmode_file"
+    echo "$RUN" > "$TWMDIR/runmode_file"
 
     if [ ! -s "$TMP/CLD" ]; then
         clan_id
@@ -73,5 +73,5 @@ restart_script() {
         sleep 1s
         pidf=`pgrep -f "sh.*twm/twm.sh"`
     done
-    nohup sh "$HOME/twm/twm.sh" "$RUN" >/dev/null 2>&1 &
+    nohup sh "$TWMDIR/twm.sh" "$RUN" >/dev/null 2>&1 &
 }
