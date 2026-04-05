@@ -4,20 +4,18 @@
 # TWMDIR: diretorio base do projeto
 # Exportado pelo play.sh; fallback para dirname do proprio twm.sh
 if [ -z "$TWMDIR" ]; then
-    TWMDIR=`cd "$(dirname "$0")" && pwd`
+    _twm_dir=`dirname "$0"`
+    TWMDIR=`cd "$_twm_dir" && pwd`
+    unset _twm_dir
     export TWMDIR
 fi
 
 # Carrega info.sh primeiro (define colors, echo_t, printf_t, fetch_page, run_curl)
+# language_setup() dentro do info.sh precisa de TMP — sera chamada novamente
+# apos requer_func definir TMP corretamente
 . "$TWMDIR/info.sh"
 
-# Carrega config global se existir
-if [ -f "$TWMDIR/config.cfg" ]; then
-    . "$TWMDIR/config.cfg"
-fi
-
 colors
-language_setup
 
 RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot'`
 
@@ -93,8 +91,6 @@ if [ -f "$TWMDIR/ur_file" ] && [ -s "$TWMDIR/ur_file" ]; then
     for _i in 4 3 2 1; do
         _i=$((_i - 1))
         if read -r -t 1; then
-            set_config "ALLIES" ""
-            : > "$TMP/allies.txt"
             : > "$TWMDIR/ur_file"
             : > "$TWMDIR/fileAgent.txt"
             unset UR UA AL
@@ -105,9 +101,15 @@ if [ -f "$TWMDIR/ur_file" ] && [ -s "$TWMDIR/ur_file" ]; then
     unset _i
 fi
 
-# Inicializa ambiente
-load_config
+# Ordem correta de inicializacao:
+# 1. requer_func  -> menu servidor + user-agent -> define TMP, URL, LANGUAGE
+# 2. language_setup -> agora TMP existe, carrega/cria config.cfg com LANGUAGE
+# 3. load_config  -> carrega todas as configuracoes do config.cfg
+# 4. func_proxy   -> no-op
+# 5. login_logoff -> faz login com TMP e URL ja definidos
 requer_func
+language_setup
+load_config
 func_proxy
 login_logoff
 
