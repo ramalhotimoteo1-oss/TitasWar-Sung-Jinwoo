@@ -27,7 +27,7 @@ requer_func() {
 
 		case "$input" in
 			[1-9]|10|11|12|13)
-				echo "$input" > "$HOME/twm/ur_file"
+				echo "$input" > "$TWMDIR/ur_file"
 				echo_t "Selected server: $input"
 				return 0
 				;;
@@ -65,12 +65,12 @@ requer_func() {
 	}
 
 	# Verifica se o arquivo ur_file existe e e valido
-	if [ -f "$HOME/twm/ur_file" ] && [ -s "$HOME/twm/ur_file" ]; then
-		UR=`cat "$HOME/twm/ur_file"`
+	if [ -f "$TWMDIR/ur_file" ] && [ -s "$TWMDIR/ur_file" ]; then
+		UR=`cat "$TWMDIR/ur_file"`
 		echo_t "Using existing selection: $UR"
 	else
 		menu_loop
-		UR=`cat "$HOME/twm/ur_file"`
+		UR=`cat "$TWMDIR/ur_file"`
 	fi
 
 	# Associa a selecao do usuario com URL, fuso e idioma
@@ -81,91 +81,91 @@ requer_func() {
 	case $UR in
 	(1|bra|pt)
 		URL=`echo "ZnVyaWFkZXRpdGFzLm5ldA==" | base64 -d`
-		echo "1" > "$HOME/twm/ur_file"
+		echo "1" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/1"
 		export TZ="America/Bahia"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "pt"
 		;;
 	(2|ger|de)
 		URL=`echo "dGl0YW5lbi5tb2Jp" | base64 -d`
-		echo "2" > "$HOME/twm/ur_file"
+		echo "2" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/2"
 		export TZ="Europe/Berlin"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "de"
 		;;
 	(3|esp|es)
 		URL=`echo "Z3VlcnJhZGV0aXRhbmVzLm5ldA==" | base64 -d`
-		echo "3" > "$HOME/twm/ur_file"
+		echo "3" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/3"
 		export TZ="America/Cancun"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "es"
 		;;
 	(4|fran|fr)
 		URL=`echo "dGl3YXIuZnI=" | base64 -d`
-		echo "4" > "$HOME/twm/ur_file"
+		echo "4" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/4"
 		export TZ="Europe/Paris"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "fr"
 		;;
 	(5|indi|hi)
 		URL=`echo "aW4udGl3YXIubmV0" | base64 -d`
-		echo "5" > "$HOME/twm/ur_file"
+		echo "5" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/5"
 		export TZ="Asia/Kolkata"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "hi"
 		;;
 	(6|indo|id)
 		URL=`echo "dGl3YXItaWQubmV0" | base64 -d`
-		echo "6" > "$HOME/twm/ur_file"
+		echo "6" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/6"
 		export TZ="Asia/Jakarta"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "id"
 		;;
 	(7|ital|it)
 		URL=`echo "Z3VlcnJhZGl0aXRhbmkubmV0" | base64 -d`
-		echo "7" > "$HOME/twm/ur_file"
+		echo "7" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/7"
 		export TZ="Europe/Rome"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "it"
 		;;
 	(8|pol|pl)
 		URL=`echo "dGl3YXIucGw=" | base64 -d`
-		echo "8" > "$HOME/twm/ur_file"
+		echo "8" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/8"
 		export TZ="Europe/Warsaw"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "pl"
 		;;
 	(9|rom|ro)
 		URL=`echo "dGl3YXIucm8=" | base64 -d`
-		echo "9" > "$HOME/twm/ur_file"
+		echo "9" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/9"
 		export TZ="Europe/Bucharest"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "ro"
 		;;
 	(10|rus|ru)
 		URL=`echo "dGl3YXIucnU=" | base64 -d`
-		echo "10" > "$HOME/twm/ur_file"
+		echo "10" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/10"
 		export TZ="Europe/Moscow"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "ru"
 		;;
 	(11|ser|sr)
 		URL=`echo "cnMudGl3YXIubmV0" | base64 -d`
-		echo "11" > "$HOME/twm/ur_file"
+		echo "11" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/11"
 		export TZ="Europe/Belgrade"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "sr"
 		;;
 	(12|chi|zh)
 		URL=`echo "Y24udGl3YXIubmV0" | base64 -d`
-		echo "12" > "$HOME/twm/ur_file"
+		echo "12" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/12"
 		export TZ="Asia/Shanghai"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "zh"
 		;;
 	(13|eng|en)
 		URL=`echo "dGl3YXIubmV0" | base64 -d`
-		echo "13" > "$HOME/twm/ur_file"
+		echo "13" > "$TWMDIR/ur_file"
 		TMP="$HOME/.twm/13"
 		export TZ="Europe/London"; ALLIAS="_WORK"
 		set_config "LANGUAGE" "en"
@@ -196,7 +196,7 @@ requer_func() {
 
 	# Copia userAgent.txt para o diretorio da conta se ainda nao existir
 	if [ ! -f "$TMP/userAgent.txt" ]; then
-		cp "$HOME/twm/userAgent.txt" "$TMP/userAgent.txt" 2>/dev/null
+		cp "$TWMDIR/userAgent.txt" "$TMP/userAgent.txt" 2>/dev/null
 	fi
 
 	# Define o arquivo de cookie por conta (sem mktemp)
