@@ -1,39 +1,43 @@
 #!/bin/sh
 
-# play.sh - gerencia execucao do twm.sh com isolamento de conta por TMP
-(
-  RUN=$1
+# Detecta o diretorio real onde play.sh esta instalado
+# Funciona independente de onde o script e chamado (./play.sh, ~/dir/play.sh, etc.)
+TWMDIR=`cd "$(dirname "$0")" && pwd`
+export TWMDIR
 
-  while true; do
-    # Mata apenas processos do twm.sh vinculados ao diretorio desta conta
-    # A conta e identificada pelo TMP que sera exportado pelo twm.sh
-    pidf=`ps ax -o pid=,args= | grep "sh.*twm/twm.sh" | grep -v grep | head -n 1 | grep -o -E '([0-9]{3,6})'`
+RUN=$1
+
+# Garante que o diretorio existe e cria runmode_file se necessario
+mkdir -p "$TWMDIR"
+
+while true; do
+    # Mata processos twm.sh anteriores deste mesmo diretorio
+    pidf=`ps ax -o pid=,args= | grep "sh.*twm.sh" | grep "$TWMDIR" | grep -v grep | head -n 1 | grep -o -E '([0-9]{3,6})'`
 
     until [ -z "${pidf}" ]; do
-      kill -9 ${pidf} 2>/dev/null
-      pidf=`ps ax -o pid=,args= | grep "sh.*twm/twm.sh" | grep -v grep | head -n 1 | grep -o -E '([0-9]{3,6})'`
-      sleep 1s
+        kill -9 ${pidf} 2>/dev/null
+        pidf=`ps ax -o pid=,args= | grep "sh.*twm.sh" | grep "$TWMDIR" | grep -v grep | head -n 1 | grep -o -E '([0-9]{3,6})'`
+        sleep 1s
     done
 
     run_mode() {
-      chmod +x "$HOME/twm/twm.sh"
+        chmod +x "$TWMDIR/twm.sh"
 
-      if echo "$RUN" | grep -q -E '[-]cl'; then
-        echo '-cl' > "$HOME/twm/runmode_file"
-        "$HOME"/twm/twm.sh -cl
-      elif echo "$RUN" | grep -q -E '[-]cv'; then
-        echo '-cv' > "$HOME/twm/runmode_file"
-        "$HOME"/twm/twm.sh -cv
-      elif echo "$RUN" | grep -q -E '[-]boot'; then
-        echo '-boot' > "$HOME/twm/runmode_file"
-        "$HOME"/twm/twm.sh -boot
-      else
-        echo '-boot' > "$HOME/twm/runmode_file"
-        "$HOME"/twm/twm.sh -boot
-      fi
+        if echo "$RUN" | grep -q -E '[-]cl'; then
+            echo '-cl' > "$TWMDIR/runmode_file"
+            "$TWMDIR/twm.sh" -cl
+        elif echo "$RUN" | grep -q -E '[-]cv'; then
+            echo '-cv' > "$TWMDIR/runmode_file"
+            "$TWMDIR/twm.sh" -cv
+        elif echo "$RUN" | grep -q -E '[-]boot'; then
+            echo '-boot' > "$TWMDIR/runmode_file"
+            "$TWMDIR/twm.sh" -boot
+        else
+            echo '-boot' > "$TWMDIR/runmode_file"
+            "$TWMDIR/twm.sh" -boot
+        fi
     }
 
     run_mode
     sleep 0.1s
-  done
-)
+done
