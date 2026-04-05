@@ -4,27 +4,24 @@ login_logoff() {
  # Garante que TMP existe antes de qualquer operacao
  mkdir -p "$TMP"
 
- # TMP_COOKIE definido logo no inicio para que run_curl ja use o cookie correto
- # em TODAS as chamadas, incluindo a verificacao inicial de sessao
+ # TMP_COOKIE definido no inicio — run_curl ja usa cookie em todas as chamadas
  TMP_COOKIE="$TMP/cookie.txt"
  export TMP_COOKIE
 
  # Se ja existe credencial salva, tenta relogar automaticamente
  if [ -f "$TMP/cript_file" ]; then
-  # Decodifica credencial para arquivo temporario de POST
-  # O arquivo contem: login=usuario&pass=senha
-  base64 -d "$TMP/cript_file" > "$TMP/post_data"
-  chmod 600 "$TMP/post_data"
   printf "Setting session cookie...\n"
-  # --data @arquivo le o arquivo diretamente — evita quebra com caracteres especiais na senha
-  run_curl --data "@$TMP/post_data" "$URL/?sign_in=1" > /dev/null
-  run_curl --data "@$TMP/post_data" "$URL/?sign_in=1" > /dev/null
-  rm -f "$TMP/post_data"
+  SAVED=`base64 -d "$TMP/cript_file" 2>/dev/null`
+  SAVED_USER=`echo "$SAVED" | sed 's/login=//;s/&pass=.*//'`
+  SAVED_PASS=`echo "$SAVED" | sed 's/.*&pass=//'`
+  run_curl --data-urlencode "login=${SAVED_USER}" --data-urlencode "pass=${SAVED_PASS}" "${URL}/?sign_in=1" > /dev/null
+  run_curl --data-urlencode "login=${SAVED_USER}" --data-urlencode "pass=${SAVED_PASS}" "${URL}/?sign_in=1" > /dev/null
+  unset SAVED SAVED_USER SAVED_PASS
   echo_t "Session configured."
  fi
 
- # Verifica se a sessao esta ativa buscando nome do usuario logado
- run_curl "$URL/user" | grep "\[level" | grep -o -E "[[:space:]][[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14}[[:space:]]" > "$TMP/acc_file"
+ # Verifica se a sessao esta ativa
+ run_curl "${URL}/user" | grep "\[level" | grep -o -E "[[:space:]][[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14}[[:space:]]" > "$TMP/acc_file"
 
  echo_t "Checking if user matches..."
  sed -i 's/^[ \t]*//;s/[ \t]*$//' "$TMP/acc_file"
@@ -55,59 +52,36 @@ login_logoff() {
 
   log_in() {
    # Logoff antes de tentar novo login
-   run_curl "$URL/?exit" > /dev/null
+   run_curl "${URL}/?exit" > /dev/null
 
    echo_t "In case of error will repeat" "${BLACK_YELLOW}" "${COLOR_RESET}"
-   echo_t "Username: "
+   printf "Username: "
    read -r username
+   printf "Password: "
 
-   prompt=`translate_and_cache "$LANGUAGE" "Password: "`
-   charcount=0
-   password=""
-
-   while read -p "$prompt" -r -s -n 1 char; do
-
-    # NULL aceita a senha
-    if [ "$char" = "" ]; then
-     break
-    fi
-
-    # DEL apaga um caractere (octal 177)
-    if [ "$char" = "`printf '\177'`" ]; then
-     if [ "$charcount" -gt 0 ]; then
-      charcount=$((charcount - 1))
-      prompt="`printf '\b \b'`"
-      password=`echo "$password" | sed 's/.$//'`
-     else
-      prompt=""
-     fi
-    else
-     charcount=$((charcount + 1))
-     prompt="*"
-     password="${password}${char}"
-    fi
-
-   done
-
+   # stty -echo: oculta digitacao da senha — compativel com sh do Termux
+   # read -s NAO funciona em sh, apenas em bash
+   stty -echo 2>/dev/null
+   read -r password
+   stty echo 2>/dev/null
    printf "\n"
+
    echo_t "Please wait..."
 
-   # Salva credencial em base64 (criptografia basica para nao ficar em texto puro)
+   # Salva credencial em base64
    printf "login=%s&pass=%s" "$username" "$password" | base64 -w 0 > "$TMP/cript_file"
    chmod 600 "$TMP/cript_file"
 
-   # Decodifica para arquivo de POST (curl le direto do arquivo)
-   base64 -d "$TMP/cript_file" > "$TMP/post_data"
-   chmod 600 "$TMP/post_data"
-
    unset username password
 
-   # Login 2x — igual ao comportamento original do w3m
-   # --data @arquivo garante que caracteres especiais na senha nao quebram o POST
+   # Login 2x — igual ao comportamento original
    echo_t "Setting session cookie..."
-   run_curl --data "@$TMP/post_data" "$URL/?sign_in=1" > /dev/null
-   run_curl --data "@$TMP/post_data" "$URL/?sign_in=1" > /dev/null
-   rm -f "$TMP/post_data"
+   SAVED=`base64 -d "$TMP/cript_file" 2>/dev/null`
+   SAVED_USER=`echo "$SAVED" | sed 's/login=//;s/&pass=.*//'`
+   SAVED_PASS=`echo "$SAVED" | sed 's/.*&pass=//'`
+   run_curl --data-urlencode "login=${SAVED_USER}" --data-urlencode "pass=${SAVED_PASS}" "${URL}/?sign_in=1" > /dev/null
+   run_curl --data-urlencode "login=${SAVED_USER}" --data-urlencode "pass=${SAVED_PASS}" "${URL}/?sign_in=1" > /dev/null
+   unset SAVED SAVED_USER SAVED_PASS
    echo_t "Session configured."
   }
   log_in
@@ -115,8 +89,8 @@ login_logoff() {
   clear
   echo_t "Please wait..."
 
-  # Verifica sessao apos login — cookie ja esta em TMP_COOKIE
-  run_curl "$URL/user" | grep "\[level" | grep -o -E "[[:space:]][[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14}[[:space:]]" > "$TMP/acc_file"
+  # Verifica sessao apos login
+  run_curl "${URL}/user" | grep "\[level" | grep -o -E "[[:space:]][[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14}[[:space:]]" > "$TMP/acc_file"
 
   echo_t "Checking if user matches..."
   ACC=`cat "$TMP/acc_file"`
@@ -124,6 +98,9 @@ login_logoff() {
   if [ -n "$ACC" ]; then
    break
   fi
+
+  # Login falhou: limpa cookie para forcar novo handshake
+  rm -f "$TMP_COOKIE"
 
  done
 
@@ -141,7 +118,6 @@ login_logoff() {
   export TMP
  fi
 
- # Reatualiza TMP_COOKIE para o diretorio definitivo
  TMP_COOKIE="$TMP/cookie.txt"
  export TMP_COOKIE
 
