@@ -34,16 +34,16 @@ check_cave_limits() {
     if [ "$CAVE_GOLD_LIMIT" -gt 0 ] && [ "$GOLD_SPENT_TOTAL" -ge "$CAVE_GOLD_LIMIT" ]; then
         printf "Gold limit reached (%s/%s)\n" "$GOLD_SPENT_TOTAL" "$CAVE_GOLD_LIMIT"
         sleep 3s
-        echo "-boot" > "$HOME/twm/runmode_file"
-        "$HOME/twm/twm.sh" -boot
+        echo "-boot" > "$TWMDIR/runmode_file"
+        "$TWMDIR/twm.sh" -boot
         exit 0
     fi
 
     if [ "$CAVE_SILVER_LIMIT" -gt 0 ] && [ "$SILVER_SPENT_TOTAL" -ge "$CAVE_SILVER_LIMIT" ]; then
         printf "Silver limit reached (%s/%s)\n" "$SILVER_SPENT_TOTAL" "$CAVE_SILVER_LIMIT"
         sleep 3s
-        echo "-boot" > "$HOME/twm/runmode_file"
-        "$HOME/twm/twm.sh" -boot
+        echo "-boot" > "$TWMDIR/runmode_file"
+        "$TWMDIR/twm.sh" -boot
         exit 0
     fi
 }
@@ -89,8 +89,8 @@ check_cave_keypress() {
     if [ "$key" = "x" ] || [ "$key" = "X" ]; then
         printf "Restarting in routine mode...\n"
         sleep 3s
-        echo "-boot" > "$HOME/twm/runmode_file"
-        "$HOME/twm/twm.sh" -boot
+        echo "-boot" > "$TWMDIR/runmode_file"
+        "$TWMDIR/twm.sh" -boot
         exit 0
     fi
 }
