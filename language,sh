@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Arquivo de cache de traducoes
-TRANSLATIONS_FILE="$HOME/twm/translations.po"
+TRANSLATIONS_FILE="$TWMDIR/translations.po"
 SOURCE="en"
 
 # Funcao para traduzir via API (curl + jq)
