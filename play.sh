@@ -103,11 +103,17 @@ printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
 printf "Acompanhar conta:  ${CYAN}tail -f ~/.twm/BR_Sherman/twm.log${RESET}\n"
 printf "Parar tudo:        ${CYAN}./stop.sh${RESET}\n\n"
 
-# Monitor de status — usa fd3 para nao conflitar com stdin
-printf "${CYAN}Monitor (Ctrl+C para sair):${RESET}\n"
+
+# Monitor de status — interface minimalista, limpa a cada ciclo
+
+# Monitor de status
 while true; do
-    sleep 20
-    printf "\n--- %s ---\n" "`date +%H:%M:%S`"
+    clear
+    now=`date +%H:%M:%S`
+
+    printf "%s\n" "╔══════════════════════════════════════╗"
+    printf "║  %-22s%s  ║\n" "TWM Multi-contas" "$now"
+    printf "%s\n" "╠══════════════════════════════════════╣"
 
     while IFS='|' read -r srv user _enc <&3; do
         case "$srv" in ''|\#*) continue ;; esac
@@ -124,13 +130,20 @@ while true; do
         fi
 
         case "$status" in
-            running)      printf "  ${GREEN}●${RESET} [%s] %s\n" "$tag" "$user" ;;
-            login_retry)  printf "  ${YELLOW}↺${RESET} [%s] %s — tentando login\n" "$tag" "$user" ;;
-            restarting)   printf "  ${YELLOW}↻${RESET} [%s] %s — reiniciando\n" "$tag" "$user" ;;
-            starting)     printf "  ${YELLOW}…${RESET} [%s] %s — iniciando\n" "$tag" "$user" ;;
-            dead)         printf "  ${RED}✖${RESET} [%s] %s — MORTO\n" "$tag" "$user" ;;
-            *)            printf "  ${GOLD}?${RESET} [%s] %s — %s\n" "$tag" "$user" "$status" ;;
+            running)     icon="●" col="\033[32m" label="online"      ;;
+            login_retry) icon="↺" col="\033[33m" label="login..."    ;;
+            restarting)  icon="↻" col="\033[33m" label="reiniciando" ;;
+            starting)    icon="…" col="\033[33m" label="iniciando"   ;;
+            dead)        icon="✖" col="\033[31m" label="ERRO"        ;;
+            *)           icon="?" col="\033[33m" label="$status"     ;;
         esac
 
+        printf "║  %b%s\033[00m [%s] %-16s %b%-10s\033[00m  ║\n" \
+            "$col" "$icon" "$tag" "$user" "$col" "$label"
+
     done 3< "$ACCOUNTS_FILE"
+
+    printf "%s\n" "╚══════════════════════════════════════╝"
+
+    sleep 20
 done
