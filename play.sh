@@ -14,10 +14,12 @@ GREEN='\033[32m'
 GOLD='\033[0;33m'
 RED='\033[0;31m'
 CYAN='\033[01;36m'
-YELLOW='\033[0;33m'
+YELLOW='\033[1;33m'
 RESET='\033[00m'
 
 mkdir -p "$STATUS_DIR"
+
+chmod +x "$TWMDIR/worker.sh" "$TWMDIR/twm.sh" 2>/dev/null
 
 server_url() {
     case "$1" in
@@ -47,11 +49,13 @@ if [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ]; then
     exit 1
 fi
 
-total=`grep -cE '^[^#]' "$ACCOUNTS_FILE" 2>/dev/null || echo 0`
+total=`grep -cE '^[^#|]' "$ACCOUNTS_FILE" 2>/dev/null || echo 0`
 printf "${CYAN}TWM Multi-contas — %s conta(s)${RESET}\n\n" "$total"
 
 n=0
-while IFS='|' read -r srv user encoded; do
+
+# Le accounts.conf linha por linha sem redirecionar stdin do shell principal
+while IFS='|' read -r srv user encoded <&3; do
     case "$srv" in ''|\#*) continue ;; esac
 
     n=$((n + 1))
@@ -65,55 +69,47 @@ while IFS='|' read -r srv user encoded; do
 
     mkdir -p "$acc_dir"
 
-    # Credencial
-    echo "$encoded" > "$acc_dir/cript_file"
-    chmod 600 "$acc_dir/cript_file"
-
     # userAgent
     [ ! -f "$acc_dir/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ] && \
         cp "$TWMDIR/userAgent.txt" "$acc_dir/userAgent.txt"
 
     printf "${GOLD}[%d/%d]${RESET} [%s] %s\n" "$n" "$total" "$tag" "$user"
+
+    # Para worker anterior desta conta se ainda estiver rodando
+    if [ -f "$pid_file" ]; then
+        old_pid=`cat "$pid_file"`
+        kill -0 "$old_pid" 2>/dev/null && kill -9 "$old_pid" 2>/dev/null
+    fi
+
     echo "starting" > "$status_file"
 
-    # Lanca worker em background
-    (
-        export TWM_SRV="$srv"
-        export TWM_URL="https://$url"
-        export TWM_USER="$user"
-        export TWM_TAG="$tag"
-        export TWM_ACC_DIR="$acc_dir"
-        export TWM_STATUS_FILE="$status_file"
+    # Lanca worker.sh completamente desanexado:
+    # - nohup: ignora SIGHUP quando o terminal fechar
+    # - < /dev/null: stdin isolado (nao herda o fd3 do loop)
+    # - worker.sh salva seu proprio PID com $$
+    nohup sh "$TWMDIR/worker.sh" \
+        "$srv" "$user" "$encoded" "$tag" \
+        "https://$url" "$acc_dir" "$status_file" "$RUN" \
+        < /dev/null >> "$log_file" 2>&1 &
 
-        # Worker nunca morre — se twm.sh encerrar inesperadamente, reinicia
-        while true; do
-            echo "running" > "$status_file"
-            sh "$TWMDIR/twm.sh" "$RUN"
-            echo "restarting" > "$status_file"
-            printf "[%s] %s — reiniciando em 10s\n" "$tag" "$user"
-            sleep 10
-        done
-    ) >> "$log_file" 2>&1 &
+    # Aguarda o worker.sh gravar seu PID
+    sleep 2
+    pid=`cat "$pid_file" 2>/dev/null`
+    printf "   PID: %s | Log: %s\n" "${pid:-?}" "$log_file"
 
-    worker_pid=$!
-    echo "$worker_pid" > "$pid_file"
-    printf "   PID: %s | Log: %s\n" "$worker_pid" "$log_file"
-    sleep 1
-
-done < "$ACCOUNTS_FILE"
+done 3< "$ACCOUNTS_FILE"
 
 printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
-printf "Comandos uteis:\n"
-printf "  ${CYAN}tail -f ~/.twm/BR_Sherman/twm.log${RESET}   acompanha conta\n"
-printf "  ${CYAN}./stop.sh${RESET}                            para tudo\n\n"
+printf "Acompanhar conta:  ${CYAN}tail -f ~/.twm/BR_Sherman/twm.log${RESET}\n"
+printf "Parar tudo:        ${CYAN}./stop.sh${RESET}\n\n"
 
-# Monitor de status
+# Monitor de status — usa fd3 para nao conflitar com stdin
 printf "${CYAN}Monitor (Ctrl+C para sair):${RESET}\n"
 while true; do
     sleep 20
-    printf "\r"
-    line=""
-    while IFS='|' read -r srv user _enc; do
+    printf "\n--- %s ---\n" "`date +%H:%M:%S`"
+
+    while IFS='|' read -r srv user _enc <&3; do
         case "$srv" in ''|\#*) continue ;; esac
         tag=`server_tag "$srv"`
         acc_id="${tag}_${user}"
@@ -122,20 +118,19 @@ while true; do
         status=`cat "$status_file" 2>/dev/null || echo "?"`
         pid=`cat "$pid_file" 2>/dev/null`
 
-        # Verifica se o processo wrapper ainda existe
         if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
             echo "dead" > "$status_file"
             status="dead"
         fi
 
         case "$status" in
-            running)      icon="${GREEN}●${RESET}" ;;
-            login_retry)  icon="${YELLOW}↺${RESET}" ;;
-            restarting)   icon="${YELLOW}↻${RESET}" ;;
-            dead)         icon="${RED}✖${RESET}" ;;
-            *)            icon="${GOLD}?${RESET}" ;;
+            running)      printf "  ${GREEN}●${RESET} [%s] %s\n" "$tag" "$user" ;;
+            login_retry)  printf "  ${YELLOW}↺${RESET} [%s] %s — tentando login\n" "$tag" "$user" ;;
+            restarting)   printf "  ${YELLOW}↻${RESET} [%s] %s — reiniciando\n" "$tag" "$user" ;;
+            starting)     printf "  ${YELLOW}…${RESET} [%s] %s — iniciando\n" "$tag" "$user" ;;
+            dead)         printf "  ${RED}✖${RESET} [%s] %s — MORTO\n" "$tag" "$user" ;;
+            *)            printf "  ${GOLD}?${RESET} [%s] %s — %s\n" "$tag" "$user" "$status" ;;
         esac
 
-        printf "  %b [%s] %-15s %s\n" "$icon" "$tag" "$user" "$status"
-    done < "$ACCOUNTS_FILE"
+    done 3< "$ACCOUNTS_FILE"
 done
