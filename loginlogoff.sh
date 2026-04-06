@@ -1,25 +1,21 @@
 # shellcheck disable=SC2148
-# loginlogoff.sh
-# Neste modelo multi-conta o login principal e feito pelo twm.sh (login_worker)
-# Esta funcao e mantida para compatibilidade com modulos que chamam login_logoff()
-# e para relogin automatico em caso de sessao expirada
+# loginlogoff.sh - relogin automatico quando sessao expira
 
 login_logoff() {
-    # Verifica se sessao ainda esta ativa
     PAGE=`run_curl "${URL}/user"`
 
-    if echo "$PAGE" | grep -q '?exit\|sign_out\|logout'; then
-        # Sessao ativa — extrai ACC atualizado
-        _acc=`echo "$PAGE" | sed -n "s/.*class='white'>\([^<]*\)<.*/\1/p" | head -n1`
+    if is_logged_in "$PAGE"; then
+        _acc=`extract_username "$PAGE"`
         [ -n "$_acc" ] && ACC=`echo "$_acc" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'`
-        unset _acc
+        unset _acc PAGE
         messages_info
         clan_id
         return 0
     fi
 
-    # Sessao expirada — tenta relogin automatico
+    # Sessao expirada — tenta relogin
     printf "[%s] %s — sessao expirada, reconectando...\n" "$TWM_TAG" "$TWM_USER"
+    rm -f "$TMP_COOKIE"
 
     cript_file="$TMP/cript_file"
     [ ! -f "$cript_file" ] && return 1
@@ -28,8 +24,6 @@ login_logoff() {
     luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
     lpass=`echo "$creds" | sed 's/.*&pass=//'`
     unset creds
-
-    rm -f "$TMP_COOKIE"
 
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
@@ -40,14 +34,14 @@ login_logoff() {
     unset luser lpass
 
     PAGE=`run_curl "${URL}/user"`
-    if echo "$PAGE" | grep -q '?exit\|sign_out\|logout'; then
-        printf "[%s] %s — reconectado com sucesso\n" "$TWM_TAG" "$TWM_USER"
+    if is_logged_in "$PAGE"; then
+        printf "[%s] %s — reconectado\n" "$TWM_TAG" "$TWM_USER"
         messages_info
         clan_id
         return 0
     fi
 
     printf "[%s] %s — falha ao reconectar\n" "$TWM_TAG" "$TWM_USER"
-    [ -n "$TWM_STATUS_FILE" ] && echo "failed" > "$TWM_STATUS_FILE"
+    [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
     return 1
 }
