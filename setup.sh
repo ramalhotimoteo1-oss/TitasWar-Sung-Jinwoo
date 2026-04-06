@@ -7,6 +7,9 @@ unset _dir
 
 ACCOUNTS_FILE="$TWMDIR/accounts.conf"
 
+# Carrega funcoes de verificacao de sessao
+. "$TWMDIR/session_check.sh"
+
 # Cores
 GREEN='\033[32m'
 GOLD='\033[0;33m'
@@ -14,7 +17,6 @@ RED='\033[0;31m'
 CYAN='\033[01;36m'
 RESET='\033[00m'
 
-# Mapa de servidores
 server_url() {
     case "$1" in
         1)  echo "furiadetitas.net" ;;
@@ -33,20 +35,12 @@ server_url() {
     esac
 }
 
-server_name() {
+server_tag() {
     case "$1" in
-        1)  echo "BR" ;;
-        2)  echo "DE" ;;
-        3)  echo "ES" ;;
-        4)  echo "FR" ;;
-        5)  echo "IN" ;;
-        6)  echo "ID" ;;
-        7)  echo "IT" ;;
-        8)  echo "PL" ;;
-        9)  echo "RO" ;;
-        10) echo "RU" ;;
-        11) echo "SR" ;;
-        12) echo "ZH" ;;
+        1)  echo "BR" ;;  2)  echo "DE" ;;  3)  echo "ES" ;;
+        4)  echo "FR" ;;  5)  echo "IN" ;;  6)  echo "ID" ;;
+        7)  echo "IT" ;;  8)  echo "PL" ;;  9)  echo "RO" ;;
+        10) echo "RU" ;;  11) echo "SR" ;;  12) echo "ZH" ;;
         13) echo "EN" ;;
     esac
 }
@@ -56,10 +50,13 @@ show_menu() {
     printf "${CYAN}╔══════════════════════════════════════╗${RESET}\n"
     printf "${CYAN}║     TWM Multi-contas — Setup         ║${RESET}\n"
     printf "${CYAN}╚══════════════════════════════════════╝${RESET}\n\n"
-    printf "${GOLD}1)${RESET} Listar contas cadastradas\n"
+    n=0
+    [ -f "$ACCOUNTS_FILE" ] && n=`grep -c '' "$ACCOUNTS_FILE" 2>/dev/null || echo 0`
+    printf "Contas cadastradas: ${GOLD}%s${RESET}\n\n" "$n"
+    printf "${GOLD}1)${RESET} Listar contas\n"
     printf "${GOLD}2)${RESET} Adicionar conta\n"
     printf "${GOLD}3)${RESET} Remover conta\n"
-    printf "${GOLD}4)${RESET} Testar login de uma conta\n"
+    printf "${GOLD}4)${RESET} Testar login\n"
     printf "${GOLD}0)${RESET} Sair\n\n"
     printf "Opcao: "
 }
@@ -71,32 +68,27 @@ list_accounts() {
         printf "${RED}Nenhuma conta cadastrada ainda.${RESET}\n"
     else
         n=1
-        while IFS='|' read -r srv user _pass; do
+        while IFS='|' read -r srv user _enc; do
+            case "$srv" in ''|\#*) continue ;; esac
             url=`server_url "$srv"`
-            tag=`server_name "$srv"`
-            printf "${GOLD}%d)${RESET} [%s] %s — %s\n" "$n" "$tag" "$user" "$url"
+            tag=`server_tag "$srv"`
+            printf "${GOLD}%d)${RESET} [%s] %-20s %s\n" "$n" "$tag" "$user" "$url"
             n=$((n + 1))
         done < "$ACCOUNTS_FILE"
     fi
     printf "\nENTER para voltar..."
-    read -r _dummy
+    read -r _d
 }
 
 show_servers() {
-    printf "\n${CYAN}Servidores disponíveis:${RESET}\n"
-    printf " 1)  BR — furiadetitas.net\n"
-    printf " 2)  DE — titanen.mobi\n"
-    printf " 3)  ES — guerradetitanes.net\n"
-    printf " 4)  FR — tiwar.fr\n"
-    printf " 5)  IN — in.tiwar.net\n"
-    printf " 6)  ID — tiwar-id.net\n"
-    printf " 7)  IT — guerraditiani.net\n"
-    printf " 8)  PL — tiwar.pl\n"
-    printf " 9)  RO — tiwar.ro\n"
-    printf "10)  RU — tiwar.ru\n"
-    printf "11)  SR — rs.tiwar.net\n"
-    printf "12)  ZH — cn.tiwar.net\n"
-    printf "13)  EN — tiwar.net\n"
+    printf "\n${CYAN}Servidores:${RESET}\n"
+    printf " 1) BR  furiadetitas.net     2) DE  titanen.mobi\n"
+    printf " 3) ES  guerradetitanes.net  4) FR  tiwar.fr\n"
+    printf " 5) IN  in.tiwar.net         6) ID  tiwar-id.net\n"
+    printf " 7) IT  guerraditiani.net    8) PL  tiwar.pl\n"
+    printf " 9) RO  tiwar.ro            10) RU  tiwar.ru\n"
+    printf "11) SR  rs.tiwar.net        12) ZH  cn.tiwar.net\n"
+    printf "13) EN  tiwar.net\n"
 }
 
 add_account() {
@@ -108,30 +100,20 @@ add_account() {
 
     case "$srv" in
         [1-9]|10|11|12|13) ;;
-        *)
-            printf "${RED}Servidor invalido.${RESET}\n"
-            sleep 2
-            return
-            ;;
+        *) printf "${RED}Servidor invalido.${RESET}\n"; sleep 2; return ;;
     esac
 
     url=`server_url "$srv"`
-    tag=`server_name "$srv"`
+    tag=`server_tag "$srv"`
 
     printf "Usuario (%s): " "$url"
     read -r user
+    [ -z "$user" ] && printf "${RED}Usuario vazio.${RESET}\n" && sleep 2 && return
 
-    if [ -z "$user" ]; then
-        printf "${RED}Usuario nao pode ser vazio.${RESET}\n"
-        sleep 2
-        return
-    fi
-
-    # Verifica se conta ja existe
+    # Verifica duplicata
     if [ -f "$ACCOUNTS_FILE" ] && grep -q "^${srv}|${user}|" "$ACCOUNTS_FILE" 2>/dev/null; then
-        printf "${RED}Conta [%s] %s ja esta cadastrada.${RESET}\n" "$tag" "$user"
-        sleep 2
-        return
+        printf "${RED}Conta [%s] %s ja existe.${RESET}\n" "$tag" "$user"
+        sleep 2; return
     fi
 
     printf "Senha: "
@@ -139,40 +121,26 @@ add_account() {
     read -r pass
     stty echo 2>/dev/null
     printf "\n"
+    [ -z "$pass" ] && printf "${RED}Senha vazia.${RESET}\n" && sleep 2 && return
 
-    if [ -z "$pass" ]; then
-        printf "${RED}Senha nao pode ser vazia.${RESET}\n"
-        sleep 2
-        return
-    fi
-
-    # Testa login antes de salvar
     printf "Testando login em %s...\n" "$url"
-    result=`curl -s -L -c /tmp/twm_test_cookie.txt -b /tmp/twm_test_cookie.txt \
-        --data-urlencode "login=${user}" \
-        --data-urlencode "pass=${pass}" \
-        "https://${url}/?sign_in=1"`
 
-    rm -f /tmp/twm_test_cookie.txt
-
-    if echo "$result" | grep -q '?exit\|sign_out\|logout'; then
-        # Salva credencial criptografada em base64
+    if test_login "https://$url" "$user" "$pass"; then
         encoded=`printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0`
         printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
-        printf "\n${GREEN}Conta [%s] %s adicionada com sucesso!${RESET}\n" "$tag" "$user"
+        printf "${GREEN}[OK] Conta [%s] %s adicionada!${RESET}\n" "$tag" "$user"
     else
-        printf "\n${RED}Login falhou. Verifique usuario e senha.${RESET}\n"
-        printf "Deseja salvar mesmo assim? (y/n): "
+        printf "${RED}Login nao confirmado automaticamente.${RESET}\n"
+        printf "Isso pode ocorrer por bloqueio de IP no teste.\n"
+        printf "Salvar a conta mesmo assim? (y/n): "
         read -r force
         case "$force" in
             y|Y)
                 encoded=`printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0`
                 printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
-                printf "${GOLD}Conta salva sem validacao.${RESET}\n"
+                printf "${GOLD}Conta salva sem validacao de login.${RESET}\n"
                 ;;
-            *)
-                printf "Conta nao salva.\n"
-                ;;
+            *) printf "Conta nao salva.\n" ;;
         esac
     fi
 
@@ -183,60 +151,46 @@ add_account() {
 remove_account() {
     clear
     printf "${CYAN}=== Remover conta ===${RESET}\n\n"
-
-    if [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ]; then
-        printf "${RED}Nenhuma conta cadastrada.${RESET}\n"
-        sleep 2
-        return
-    fi
+    [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ] && \
+        printf "${RED}Nenhuma conta.${RESET}\n" && sleep 2 && return
 
     n=1
-    while IFS='|' read -r srv user _pass; do
-        tag=`server_name "$srv"`
+    while IFS='|' read -r srv user _enc; do
+        case "$srv" in ''|\#*) continue ;; esac
+        tag=`server_tag "$srv"`
         printf "${GOLD}%d)${RESET} [%s] %s\n" "$n" "$tag" "$user"
         n=$((n + 1))
     done < "$ACCOUNTS_FILE"
 
-    printf "\nNumero da conta para remover (0 = cancelar): "
+    printf "\nNumero (0 = cancelar): "
     read -r choice
+    [ "$choice" = "0" ] || [ -z "$choice" ] && return
 
-    if [ "$choice" = "0" ] || [ -z "$choice" ]; then
-        return
-    fi
-
-    # Valida numero
-    total=`wc -l < "$ACCOUNTS_FILE"`
-    if ! echo "$choice" | grep -qE '^[0-9]+$' || [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
-        printf "${RED}Opcao invalida.${RESET}\n"
-        sleep 2
-        return
+    total=`grep -c '' "$ACCOUNTS_FILE"`
+    if ! echo "$choice" | grep -qE '^[0-9]+$' || \
+       [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
+        printf "${RED}Invalido.${RESET}\n"; sleep 2; return
     fi
 
     line=`sed -n "${choice}p" "$ACCOUNTS_FILE"`
     srv=`echo "$line" | cut -d'|' -f1`
     user=`echo "$line" | cut -d'|' -f2`
-    tag=`server_name "$srv"`
+    tag=`server_tag "$srv"`
 
     printf "Remover [%s] %s? (y/n): " "$tag" "$user"
     read -r confirm
     case "$confirm" in
         y|Y)
             sed -i "${choice}d" "$ACCOUNTS_FILE"
-            printf "${GREEN}Conta removida.${RESET}\n"
-
-            # Oferece remover diretorio de dados tambem
+            printf "${GREEN}Removida.${RESET}\n"
             acc_dir="$HOME/.twm/${tag}_${user}"
             if [ -d "$acc_dir" ]; then
-                printf "Remover dados da conta em %s? (y/n): " "$acc_dir"
-                read -r rmdata
-                case "$rmdata" in
-                    y|Y) rm -rf "$acc_dir" && printf "Dados removidos.\n" ;;
-                esac
+                printf "Remover dados em %s? (y/n): " "$acc_dir"
+                read -r rd
+                case "$rd" in y|Y) rm -rf "$acc_dir" && printf "Dados removidos.\n" ;; esac
             fi
             ;;
-        *)
-            printf "Cancelado.\n"
-            ;;
+        *) printf "Cancelado.\n" ;;
     esac
     sleep 2
 }
@@ -244,56 +198,46 @@ remove_account() {
 test_account() {
     clear
     printf "${CYAN}=== Testar login ===${RESET}\n\n"
-
-    if [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ]; then
-        printf "${RED}Nenhuma conta cadastrada.${RESET}\n"
-        sleep 2
-        return
-    fi
+    [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ] && \
+        printf "${RED}Nenhuma conta.${RESET}\n" && sleep 2 && return
 
     n=1
-    while IFS='|' read -r srv user _pass; do
-        tag=`server_name "$srv"`
+    while IFS='|' read -r srv user _enc; do
+        case "$srv" in ''|\#*) continue ;; esac
+        tag=`server_tag "$srv"`
         printf "${GOLD}%d)${RESET} [%s] %s\n" "$n" "$tag" "$user"
         n=$((n + 1))
     done < "$ACCOUNTS_FILE"
 
-    printf "\nNumero da conta para testar: "
+    printf "\nNumero: "
     read -r choice
-
-    total=`wc -l < "$ACCOUNTS_FILE"`
-    if ! echo "$choice" | grep -qE '^[0-9]+$' || [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
-        printf "${RED}Opcao invalida.${RESET}\n"
-        sleep 2
-        return
+    total=`grep -c '' "$ACCOUNTS_FILE"`
+    if ! echo "$choice" | grep -qE '^[0-9]+$' || \
+       [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
+        printf "${RED}Invalido.${RESET}\n"; sleep 2; return
     fi
 
     line=`sed -n "${choice}p" "$ACCOUNTS_FILE"`
     srv=`echo "$line" | cut -d'|' -f1`
     user=`echo "$line" | cut -d'|' -f2`
     encoded=`echo "$line" | cut -d'|' -f3`
-    tag=`server_name "$srv"`
+    tag=`server_tag "$srv"`
     url=`server_url "$srv"`
 
     creds=`echo "$encoded" | base64 -d 2>/dev/null`
     luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
     lpass=`echo "$creds" | sed 's/.*&pass=//'`
+    unset creds
 
-    printf "Testando [%s] %s em %s...\n" "$tag" "$user" "$url"
+    printf "Testando [%s] %s...\n" "$tag" "$user"
 
-    result=`curl -s -L -c /tmp/twm_test_cookie.txt -b /tmp/twm_test_cookie.txt \
-        --data-urlencode "login=${luser}" \
-        --data-urlencode "pass=${lpass}" \
-        "https://${url}/?sign_in=1"`
-
-    rm -f /tmp/twm_test_cookie.txt
-    unset lpass creds
-
-    if echo "$result" | grep -q '?exit\|sign_out\|logout'; then
-        printf "${GREEN}Login OK — sessao ativa.${RESET}\n"
+    if test_login "https://$url" "$luser" "$lpass"; then
+        printf "${GREEN}[OK] Login confirmado.${RESET}\n"
     else
-        printf "${RED}Login FALHOU.${RESET}\n"
+        printf "${RED}[FALHOU] Login nao confirmado.${RESET}\n"
+        printf "Nota: pode ser bloqueio de IP. O bot pode funcionar mesmo assim.\n"
     fi
+    unset lpass
     sleep 3
 }
 
@@ -307,6 +251,5 @@ while true; do
         3) remove_account ;;
         4) test_account ;;
         0) printf "\nSaindo...\n"; exit 0 ;;
-        *) ;;
     esac
 done
