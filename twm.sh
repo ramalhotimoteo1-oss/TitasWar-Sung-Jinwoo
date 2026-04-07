@@ -40,18 +40,23 @@ esac
 
 mkdir -p "$TMP"
 
-# Carrega modulos
+# Carrega modulos base
 . "$TWMDIR/info.sh"
 . "$TWMDIR/session_check.sh"
 colors
 
-RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot'`
+# RUN seguro
+RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null`
+[ -z "$RUN" ] && RUN="-boot"
 
+# Mantem acordado no Termux
 if [ -d /data/data/com.termux/files/usr/share/doc ]; then
     termux-wake-lock 2>/dev/null
 fi
 
 cd "$TWMDIR" || exit 1
+
+# Carrega libs
 for _lib in \
     language.sh requeriments.sh loginlogoff.sh \
     flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
@@ -73,38 +78,42 @@ load_config
 if [ ! -f "$TMP/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ]; then
     cp "$TWMDIR/userAgent.txt" "$TMP/userAgent.txt"
 fi
+
 random_ua 2>/dev/null
 [ -z "$vUserAgent" ] && vUserAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36"
 export vUserAgent
 
-# Arquivos de aliados
-[ ! -f "$TMP/allies.txt" ]   && : > "$TMP/allies.txt"
-[ ! -f "$TMP/callies.txt" ]  && : > "$TMP/callies.txt"
+# Arquivos auxiliares
+[ ! -f "$TMP/allies.txt" ] && : > "$TMP/allies.txt"
+[ ! -f "$TMP/callies.txt" ] && : > "$TMP/callies.txt"
 
 printf "[%s] %s — iniciando\n" "$TWM_TAG" "$TWM_USER"
 
-# Login com retry — nunca mata o worker por falha de login
-# Tenta indefinidamente com delay crescente
+# =========================
+# LOGIN COM RETRY INFINITO
+# =========================
 do_login() {
+
     cript_file="$TMP/cript_file"
-    [ ! -f "$cript_file" ] && printf "[%s] %s — ERRO: sem credenciais\n" "$TWM_TAG" "$TWM_USER" && return 1
+    [ ! -f "$cript_file" ] && return 1
 
     creds=`base64 -d "$cript_file" 2>/dev/null`
     luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
     lpass=`echo "$creds" | sed 's/.*&pass=//'`
     unset creds
 
-    # POST de login 2x
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
              "${URL}/?sign_in=1" > /dev/null
+
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
              "${URL}/?sign_in=1" > /dev/null
+
     unset luser lpass
 
-    # Verifica sessao
     PAGE=`run_curl "${URL}/user"`
+
     if is_logged_in "$PAGE"; then
         ACC=`extract_username "$PAGE"`
         [ -z "$ACC" ] && ACC="$TWM_USER"
@@ -112,49 +121,70 @@ do_login() {
         printf "[%s] %s — login OK\n" "$TWM_TAG" "$ACC"
         return 0
     fi
+
     return 1
 }
 
-# Loop de login com retry e delay crescente
-login_delay=30
+# loop login
+login_delay=20
+
 while true; do
+
     if do_login; then
         break
     fi
-    printf "[%s] %s — login falhou, tentando novamente em %ss\n" \
+
+    printf "[%s] %s — login retry em %ss\n" \
         "$TWM_TAG" "$TWM_USER" "$login_delay"
+
     [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
+
     sleep "$login_delay"
-    # Delay cresce ate 5min, depois estabiliza
-    [ "$login_delay" -lt 300 ] && login_delay=$((login_delay * 2))
-    [ "$login_delay" -gt 300 ] && login_delay=300
-    # Limpa cookie para novo handshake
+
     rm -f "$TMP_COOKIE"
+
+    [ "$login_delay" -lt 120 ] && login_delay=$((login_delay + 10))
+
 done
+
+# =========================
+# INICIALIZAÇÃO
+# =========================
 
 clan_id 2>/dev/null
 func_proxy
 
 twm_start() {
-    if echo "$RUN" | grep -q -E '[-]cv'; then
+
+    if echo "$RUN" | grep -q -- "-cv"; then
         cave_start
-    elif echo "$RUN" | grep -q -E '[-]cl'; then
-        twm_play
-    elif echo "$RUN" | grep -q -E '[-]boot'; then
-        twm_play
-    else
-        twm_play
+        return
     fi
+
+    if echo "$RUN" | grep -q -- "-cl"; then
+        twm_play
+        return
+    fi
+
+    twm_play
 }
 
 func_unset() {
-    unset HP1 HP2 YOU USER CLAN ENTER ATK ATKRND DODGE HEAL GRASS STONE BEXIT OUTGATE LEAVEFIGHT WDRED CAVE BREAK NEWCAVE
+    unset HP1 HP2 YOU USER CLAN ENTER ATK ATKRND DODGE HEAL
+    unset GRASS STONE BEXIT OUTGATE LEAVEFIGHT WDRED
+    unset CAVE BREAK NEWCAVE
 }
 
 [ -n "$TWM_STATUS_FILE" ] && echo "running" > "$TWM_STATUS_FILE"
+
 printf "[%s] %s — loop principal iniciado\n" "$TWM_TAG" "$ACC"
 
-while true; do
+# =========================
+# LOOP PRINCIPAL ESTÁVEL
+# =========================
+
+while true
+do
     twm_start
+    sleep 2
 done
- 
