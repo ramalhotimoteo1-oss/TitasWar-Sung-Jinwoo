@@ -39,6 +39,9 @@ cd TitasWarPro-Mult-contas
 # Dá permissão aos scripts
 
 chmod +x play.sh
+
+---
+
 chmod +x setup.sh
 
 ---
