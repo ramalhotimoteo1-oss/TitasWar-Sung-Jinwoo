@@ -1,19 +1,20 @@
-#!/bin/sh
+#!/data/data/com.termux/files/home/.multcf/toybox bash
 # shellcheck disable=SC1091
 # twm.sh - Worker de conta individual (nao interativo)
+TOYBOX="${TOYBOX:-$HOME/.multcf/toybox}"
+if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
+    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"   fi
 
 if [ -z "$TWMDIR" ]; then
-    _d=`dirname "$0"`
-    TWMDIR=`cd "$_d" && pwd`
+    _d=$(dirname "$0")
+    TWMDIR=$(cd "$_d" && pwd)
     unset _d
     export TWMDIR
 fi
-
-# Valida variaveis obrigatorias injetadas pelo play.sh
+                                                      # Valida variaveis obrigatorias injetadas pelo play.sh
 if [ -z "$TWM_SRV" ] || [ -z "$TWM_URL" ] || [ -z "$TWM_ACC_DIR" ]; then
     printf "ERRO: twm.sh deve ser chamado pelo play.sh\n"
-    exit 1
-fi
+    exit 1                                            fi
 
 # Variaveis de ambiente da conta
 URL="$TWM_URL"
@@ -40,23 +41,21 @@ esac
 
 mkdir -p "$TMP"
 
-# Carrega modulos base
+# Grava status imediatamente — distingue 'starting'(worker ok) de 'loading'(twm iniciou)
+[ -n "$TWM_STATUS_FILE" ] && echo "loading" > "$TWM_STATUS_FILE"
+
+# Carrega modulos
 . "$TWMDIR/info.sh"
 . "$TWMDIR/session_check.sh"
 colors
 
-# RUN seguro
-RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null`
-[ -z "$RUN" ] && RUN="-boot"
+RUN=$(cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot')
 
-# Mantem acordado no Termux
 if [ -d /data/data/com.termux/files/usr/share/doc ]; then
     termux-wake-lock 2>/dev/null
 fi
 
 cd "$TWMDIR" || exit 1
-
-# Carrega libs
 for _lib in \
     language.sh requeriments.sh loginlogoff.sh \
     flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
@@ -78,113 +77,77 @@ load_config
 if [ ! -f "$TMP/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ]; then
     cp "$TWMDIR/userAgent.txt" "$TMP/userAgent.txt"
 fi
-
 random_ua 2>/dev/null
 [ -z "$vUserAgent" ] && vUserAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36"
 export vUserAgent
 
-# Arquivos auxiliares
-[ ! -f "$TMP/allies.txt" ] && : > "$TMP/allies.txt"
+# Arquivos de aliados
+[ ! -f "$TMP/allies.txt" ]  && : > "$TMP/allies.txt"
 [ ! -f "$TMP/callies.txt" ] && : > "$TMP/callies.txt"
 
 printf "[%s] %s — iniciando\n" "$TWM_TAG" "$TWM_USER"
 
-# =========================
-# LOGIN COM RETRY INFINITO
-# =========================
+# Login com retry — delay crescente, nunca mata o worker
 do_login() {
-
     cript_file="$TMP/cript_file"
-    [ ! -f "$cript_file" ] && return 1
+    [ ! -f "$cript_file" ] && printf "[%s] %s — ERRO: sem credenciais\n" "$TWM_TAG" "$TWM_USER" && return 1
 
-    creds=`base64 -d "$cript_file" 2>/dev/null`
-    luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
-    lpass=`echo "$creds" | sed 's/.*&pass=//'`
+    creds=$(base64 -d "$cript_file" 2>/dev/null)
+    luser=$(echo "$creds" | sed 's/login=//;s/&pass=.*//')
+    lpass=$(echo "$creds" | sed 's/.*&pass=//')
     unset creds
 
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
              "${URL}/?sign_in=1" > /dev/null
-
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
              "${URL}/?sign_in=1" > /dev/null
-
     unset luser lpass
 
-    PAGE=`run_curl "${URL}/user"`
-
+    PAGE=$(run_curl "${URL}/user")
     if is_logged_in "$PAGE"; then
-        ACC=`extract_username "$PAGE"`
+        ACC=$(extract_username "$PAGE")
         [ -z "$ACC" ] && ACC="$TWM_USER"
         export ACC
         printf "[%s] %s — login OK\n" "$TWM_TAG" "$ACC"
         return 0
     fi
-
     return 1
 }
 
-# loop login
-login_delay=20
-
+login_delay=30
 while true; do
-
     if do_login; then
         break
     fi
-
-    printf "[%s] %s — login retry em %ss\n" \
+    printf "[%s] %s — login falhou, tentando em %ss\n" \
         "$TWM_TAG" "$TWM_USER" "$login_delay"
-
     [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
-
     sleep "$login_delay"
-
+    [ "$login_delay" -lt 300 ] && login_delay=$((login_delay * 2))
+    [ "$login_delay" -gt 300 ] && login_delay=300
     rm -f "$TMP_COOKIE"
-
-    [ "$login_delay" -lt 120 ] && login_delay=$((login_delay + 10))
-
 done
-
-# =========================
-# INICIALIZAÇÃO
-# =========================
 
 clan_id 2>/dev/null
 func_proxy
 
 twm_start() {
-
-    if echo "$RUN" | grep -q -- "-cv"; then
-        cave_start
-        return
-    fi
-
-    if echo "$RUN" | grep -q -- "-cl"; then
-        twm_play
-        return
-    fi
-
-    twm_play
+    case "$RUN" in
+        *-cv*) cave_start ;;
+        *-cl*) twm_play ;;
+        *)     twm_play ;;
+    esac
 }
 
 func_unset() {
-    unset HP1 HP2 YOU USER CLAN ENTER ATK ATKRND DODGE HEAL
-    unset GRASS STONE BEXIT OUTGATE LEAVEFIGHT WDRED
-    unset CAVE BREAK NEWCAVE
+    unset HP1 HP2 YOU USER CLAN ENTER ATK ATKRND DODGE HEAL GRASS STONE BEXIT OUTGATE LEAVEFIGHT WDRED CAVE BREAK NEWCAVE
 }
 
 [ -n "$TWM_STATUS_FILE" ] && echo "running" > "$TWM_STATUS_FILE"
-
 printf "[%s] %s — loop principal iniciado\n" "$TWM_TAG" "$ACC"
 
-# =========================
-# LOOP PRINCIPAL ESTÁVEL
-# =========================
-
-while true
-do
+while true; do
     twm_start
-    sleep 2
 done
