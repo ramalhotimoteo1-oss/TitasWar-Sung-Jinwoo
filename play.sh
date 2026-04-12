@@ -1,17 +1,10 @@
-#!/bin/sh
-# play.sh - Orquestrador multi-contas TWM
-
-_dir=`dirname "$0"`
-TWMDIR=`cd "$_dir" && pwd`
+#!/data/data/com.termux/files/home/.multcf/toybox bash# Fallback: se nao estiver rodando com toybox, reexecuta com ele                                            TOYBOX="$HOME/.multcf/toybox"                         if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"   fi                                                    export TOYBOX                                                                                               _dir=$(dirname "$0")                                  TWMDIR=$(cd "$_dir" && pwd)
 unset _dir
-export TWMDIR
-
+export TWMDIR                                         
 ACCOUNTS_FILE="$TWMDIR/accounts.conf"
-
-# Mantem o Termux acordado enquanto o monitor roda
+                                                      # Mantem o Termux acordado enquanto o monitor roda
 termux-wake-lock 2>/dev/null
-STATUS_DIR="$HOME/.twm/status"
-RUN="${1:--boot}"
+STATUS_DIR="$HOME/.twm/status"                        RUN="${1:--boot}"
 
 GREEN='\033[32m'
 GOLD='\033[0;33m'
@@ -52,18 +45,18 @@ if [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ]; then
     exit 1
 fi
 
-total=`grep -cE '^[^#|]' "$ACCOUNTS_FILE" 2>/dev/null || echo 0`
-printf "${CYAN}TWM Multi-contas — %s conta(s)${RESET}\n\n" "$total"
+total=$(grep -cE '^[^#|]' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
+printf "${CYAN}TWM Multi-contas — %s conta(s) ${RESET}\n\n" "$total"
 
 n=0
 
-# Le accounts.conf linha por linha sem redirecionar stdin do shell principal
+# Le accounts.conf via fd3 — nao redireciona stdin do shell principal
 while IFS='|' read -r srv user encoded <&3; do
     case "$srv" in ''|\#*) continue ;; esac
 
     n=$((n + 1))
-    url=`server_url "$srv"`
-    tag=`server_tag "$srv"`
+    url=$(server_url "$srv")
+    tag=$(server_tag "$srv")
     acc_id="${tag}_${user}"
     acc_dir="$HOME/.twm/${acc_id}"
     status_file="$STATUS_DIR/${acc_id}.status"
@@ -72,33 +65,38 @@ while IFS='|' read -r srv user encoded <&3; do
 
     mkdir -p "$acc_dir"
 
-    # userAgent
     [ ! -f "$acc_dir/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ] && \
         cp "$TWMDIR/userAgent.txt" "$acc_dir/userAgent.txt"
 
     printf "${GOLD}[%d/%d]${RESET} [%s] %s\n" "$n" "$total" "$tag" "$user"
 
-    # Para worker anterior desta conta se ainda estiver rodando
+    # Para worker anterior se ainda estiver rodando
     if [ -f "$pid_file" ]; then
-        old_pid=`cat "$pid_file"`
+        old_pid=$(cat "$pid_file")
         kill -0 "$old_pid" 2>/dev/null && kill -9 "$old_pid" 2>/dev/null
     fi
 
     echo "starting" > "$status_file"
 
-    # Lanca worker.sh completamente desanexado:
-    # - nohup: ignora SIGHUP quando o terminal fechar
-    # - < /dev/null: stdin isolado (nao herda o fd3 do loop)
-    # - worker.sh salva seu proprio PID com $$
-    nohup sh "$TWMDIR/worker.sh" \
+    # Lanca worker completamente desanexado com toybox
+    TOYBOX="$TOYBOX" _TOYBOX_RUNNING="" \
+    nohup "$TOYBOX" bash "$TWMDIR/worker.sh" \
         "$srv" "$user" "$encoded" "$tag" \
         "https://$url" "$acc_dir" "$status_file" "$RUN" \
         < /dev/null >> "$log_file" 2>&1 &
 
-    # Aguarda o worker.sh gravar seu PID
-    sleep 2
-    pid=`cat "$pid_file" 2>/dev/null`
-    printf "   PID: %s | Log: %s\n" "${pid:-?}" "$log_file"
+    # Aguarda PID com retry — ate 10s
+    pid=""
+    _w=0
+    while [ -z "$pid" ] && [ $_w -lt 10 ]; do
+        sleep 1
+        pid=$(cat "$pid_file" 2>/dev/null)
+        _w=$((_w + 1))
+    done
+    printf "   PID: %s | Log: %s\n" "${pid:-FALHOU}" "$log_file"
+    if [ -z "$pid" ]; then
+        printf "   AVISO: worker nao iniciou. Verifique %s\n" "$log_file"
+    fi
 
 done 3< "$ACCOUNTS_FILE"
 
@@ -106,13 +104,12 @@ printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
 printf "Acompanhar conta:  ${CYAN}tail -f ~/.twm/BR_Sherman/twm.log${RESET}\n"
 printf "Parar tudo:        ${CYAN}./stop.sh${RESET}\n\n"
 
-
 # Monitor de status
 W="======================================"
 
 while true; do
     clear
-    now=`date +%H:%M:%S`
+    now=$(date +%H:%M:%S)
 
     printf "╔%s╗\n" "$W"
     printf "║  TWM Multi-contas        %s  ║\n" "$now"
@@ -120,12 +117,12 @@ while true; do
 
     while IFS='|' read -r srv user _enc <&3; do
         case "$srv" in ''|\#*) continue ;; esac
-        tag=`server_tag "$srv"`
+        tag=$(server_tag "$srv")
         acc_id="${tag}_${user}"
         status_file="$STATUS_DIR/${acc_id}.status"
         pid_file="$STATUS_DIR/${acc_id}.pid"
-        status=`cat "$status_file" 2>/dev/null || echo "?"`
-        pid=`cat "$pid_file" 2>/dev/null`
+        status=$(cat "$status_file" 2>/dev/null || echo "?")
+        pid=$(cat "$pid_file" 2>/dev/null)
 
         if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
             echo "dead" > "$status_file"
@@ -134,6 +131,7 @@ while true; do
 
         case "$status" in
             running)     col="\033[32m" label="online"      ;;
+            loading)     col="\033[33m" label="carregando"  ;;
             login_retry) col="\033[33m" label="login..."    ;;
             restarting)  col="\033[33m" label="reiniciando" ;;
             starting)    col="\033[33m" label="iniciando"   ;;
@@ -141,7 +139,7 @@ while true; do
             *)           col="\033[33m" label="$status"     ;;
         esac
 
-        entry=`printf "[%s] %-16s %-10s" "$tag" "$user" "$label"`
+        entry=$(printf "[%s] %-16s %-10s" "$tag" "$user" "$label")
         printf "║  %b* %s\033[00m  ║\n" "$col" "$entry"
 
     done 3< "$ACCOUNTS_FILE"
@@ -149,7 +147,7 @@ while true; do
     printf "╚%s╝\n" "$W"
 
     _i=0
-    while [ $_i -lt 10 ]; do
+    while [ $_i -lt 20 ]; do
         sleep 1
         _i=$((_i + 1))
     done
