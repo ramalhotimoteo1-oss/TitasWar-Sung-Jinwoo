@@ -1,45 +1,51 @@
-# 📱 TitansWarPro-Mult-contas — Tutorial Completo (Termux Atualizado)
+# 🚀 TitasWarPro (TWM) - Multi Contas
 
-Este tutorial ensina **do zero** como instalar e executar o **TitansWarPro-Mult-contas** no Termux.
+Automação completa para o jogo TitansWar.
 
-✅ Funciona após o update novo do Termux  
-✅ Funciona em qualquer diretório  
-✅ Não depende mais de caminho fixo  
-✅ Suporte a multi-contas  
-✅ Instalação limpa e rápida  
+Este bot executa automaticamente as principais atividades do jogo em ciclos, permitindo jogar 24h sem intervenção manual.
 
 ---
 
-# 🧰 1. Preparar o Termux (OBRIGATÓRIO)
+## ⚠️ Requisitos
 
-Atualize tudo:
+- Conta com **nível 16+**
+- Pelo menos **50 pontos de treinamento**
+- Conexão com internet estável
 
+---
+
+## 🤖 Funcionalidades
+
+- ⚔️ Arena → Gasta toda a mana  
+- 🛡️ Carreira → Luta e coleta recompensas  
+- 🕳️ Caverna → Completa (modo loop opcional)  
+- 🧙 Cabana do Sábio → Missões, coleções e relíquias  
+- 🏟️ Coliseu → Automático (00:00 às 04:00)  
+- 🗺️ Campanha → 100% funcional  
+- 💰 Troca → Prata → Ouro automático  
+- 🏰 Masmorra do Clã → Automático  
+- 🎉 Eventos diários → Incluindo boss  
+- ⏳ Eventos temporários → Parcial  
+
+---
+
+## ⚙️ Extras
+
+- Uso automático de elixir  
+- Uso de pedra em boss  
+- Esquiva de aliados  
+- Execução manual (`list`)  
+- Multi-contas  
+- 🔐 Senha criptografada localmente  
+
+---
+
+# 📦 Instalação
+
+---
+
+## 📱 Termux (Android - versão antiga ⚠️)
+
+### Atualizar
 ```bash
-pkg update -y && pkg upgrade -y
-
-pkg install git -y
-pkg install curl -y
-pkg install wget -y
-pkg install proot -y
-pkg install proot-distro -y
-pkg install nano -y
-pkg install dos2unix -y
-pkg install grep -y
-pkg install sed -y
-pkg install coreutils -y
-pkg install util-linux -y
-pkg install openssl -y
-
-termux-setup-storage
-
-cd ~
-git clone https://github.com/ramalhotimoteo1-oss/TitasWarPro-Mult-contas.git
-cd TitasWarPro-Mult-contas
-
-mkdir twm
-cd twm
-git clone https://github.com/ramalhotimoteo1-oss/TitasWarPro-Mult-contas.git .
-
-chmod +x *.sh
-
-./play.sh
+pkg update && pkg upgrade -y
