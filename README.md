@@ -40,20 +40,27 @@ Este bot executa automaticamente as principais atividades do jogo em ciclos, per
 
 ---
 
-# 📦 Instalação
+# 🚀 TitasWarPro (TWM) - Multi Contas
+
+Automação completa para o jogo TitansWar.
 
 ---
 
 ## 📱 Termux (Android - versão antiga ⚠️)
 
 ### Atualizar
+
 ```bash
-pkg update && pkg upgrade -y
+pkg update
 
 
----
+pkg upgrade -y
 
-pkg install git curl wget w3m jq procps coreutils ncurses-utils -y
+pkg install git
+
+
+
+
 
 
 
