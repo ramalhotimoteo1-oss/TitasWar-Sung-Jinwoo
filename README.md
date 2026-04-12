@@ -49,3 +49,14 @@ Este bot executa automaticamente as principais atividades do jogo em ciclos, per
 ### Atualizar
 ```bash
 pkg update && pkg upgrade -y
+
+
+---
+
+pkg install git curl wget w3m jq procps coreutils ncurses-utils -y
+
+
+
+
+
+
