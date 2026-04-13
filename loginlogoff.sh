@@ -17,9 +17,11 @@ login_logoff() {
     cript_file="$TMP/cript_file"
     [ ! -f "$cript_file" ] && return 1
 
-    creds="$(base64 -d "$cript_file" 2>/dev/null)"
-    luser="$(echo "$creds" | sed 's/login=//;s/&pass=.*//')"
-    lpass="$(echo "$creds" | sed 's/.*&pass=//')"
+    # CORREÇÃO TOYBOX
+    creds="$(base64 -d < "$cript_file" 2>/dev/null)"
+
+    luser="$(printf "%s" "$creds" | sed 's/login=//;s/&pass=.*//')"
+    lpass="$(printf "%s" "$creds" | sed 's/.*&pass=//')"
     unset creds
 
     run_curl -c "$TMP_COOKIE" -b "$TMP_COOKIE" \
@@ -27,7 +29,8 @@ login_logoff() {
         --data-urlencode "pass=${lpass}" \
         "${URL}/?sign_in=1" > /dev/null
 
-    sleep 1
+    # Delay maior para toybox
+    sleep 3
 
     run_curl -c "$TMP_COOKIE" -b "$TMP_COOKIE" \
         "${URL}/user" > /dev/null
