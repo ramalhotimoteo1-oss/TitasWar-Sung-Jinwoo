@@ -1,11 +1,15 @@
 #!/data/data/com.termux/files/home/.multcf/toybox bash
-# worker.sh - Loop de uma conta individual            # Fallback: se shebang falhou, reexecuta com toybox
-TOYBOX="${TOYBOX:-$HOME/.multcf/toybox}"              if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
-    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"   fi
-
+# worker.sh - Loop de uma conta individual
+# Fallback: se shebang falhou, reexecuta com toybox
+TOYBOX="${TOYBOX:-$HOME/.multcf/toybox}"
+if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
+    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"
+fi                                                    
 TWM_SRV="$1"
-TWM_USER="$2"                                         TWM_ENCODED="$3"
-TWM_TAG="$4"                                          TWM_URL="$5"
+TWM_USER="$2"
+TWM_ENCODED="$3"
+TWM_TAG="$4"
+TWM_URL="$5"
 TWM_ACC_DIR="$6"
 TWM_STATUS_FILE="$7"
 RUN="${8:--boot}"
