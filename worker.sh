@@ -4,7 +4,8 @@
 TOYBOX="${TOYBOX:-$HOME/.multcf/toybox}"
 if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
     _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"
-fi                                                    
+fi
+
 TWM_SRV="$1"
 TWM_USER="$2"
 TWM_ENCODED="$3"
