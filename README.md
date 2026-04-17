@@ -97,7 +97,7 @@ chmod +x ~/.multcf/toybox
 Clona o repositório na pasta atual do Termux.
 
 ```bash
-git clone https://github.com/ramalhotimoteo1-oss/TitasWarPro-Mult-contas.git
+git clone https://github.com/ramalhotimoteo1-oss/TitasWar-Sung-Jinwoo.git
 ```
 
 ---
@@ -105,7 +105,7 @@ git clone https://github.com/ramalhotimoteo1-oss/TitasWarPro-Mult-contas.git
 ### 7. Entra na pasta do bot
 
 ```bash
-cd TitasWarPro-Mult-contas
+cd TitasWar-Sung-Jinwoo
 ```
 
 ---
@@ -146,17 +146,6 @@ Modo padrão — roda todas as tarefas normalmente:
 ./play.sh
 ```
 
-Modo caverna — foca exclusivamente na caverna:
-
-```bash
-./play.sh -cv
-```
-
-Modo coliseu — prioriza o coliseu:
-
-```bash
-./play.sh -cl
-```
 
 ---
 
