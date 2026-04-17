@@ -3,7 +3,8 @@
 # twm.sh - Worker de conta individual (nao interativo)
 TOYBOX="${TOYBOX:-$HOME/.multcf/toybox}"
 if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
-    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"   fi
+    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"
+fi
 
 if [ -z "$TWMDIR" ]; then
     _d=$(dirname "$0")
@@ -11,10 +12,12 @@ if [ -z "$TWMDIR" ]; then
     unset _d
     export TWMDIR
 fi
-                                                      # Valida variaveis obrigatorias injetadas pelo play.sh
+
+# Valida variaveis obrigatorias injetadas pelo play.sh
 if [ -z "$TWM_SRV" ] || [ -z "$TWM_URL" ] || [ -z "$TWM_ACC_DIR" ]; then
     printf "ERRO: twm.sh deve ser chamado pelo play.sh\n"
-    exit 1                                            fi
+    exit 1
+fi
 
 # Variaveis de ambiente da conta
 URL="$TWM_URL"
