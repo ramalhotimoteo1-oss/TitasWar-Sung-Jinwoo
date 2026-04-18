@@ -38,6 +38,18 @@ king_fight() {
     fi
   }
 
+  # Calcula porcentagem de HP do rei
+  # HP2 = HP atual do rei, FULL = HP maximo do rei
+  king_percent() {
+    _hp2=`cat HP2 2>/dev/null`
+    _full=`cat FULL 2>/dev/null`
+    if [ -n "$_hp2" ] && [ -n "$_full" ] && [ "$_full" -gt 0 ] 2>/dev/null; then
+      awk -v h="$_hp2" -v f="$_full" 'BEGIN { printf "%.2f", h / f * 100 }'
+    else
+      echo "100"
+    fi
+  }
+
   cl_access
   cat HP > old_HP
   echo $(($(date +%s) - 20)) > last_dodge
@@ -47,72 +59,162 @@ king_fight() {
 
   until [ -s "BREAK_LOOP" ]; do
     : > BREAK_LOOP
-    if ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -gt 20 ] && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
-       awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
-      (
-        run_curl "${URL}$(cat DODGE)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-      cat HP > old_HP; date +%s > last_dodge
 
-    elif awk -v ush="$(cat HP)" -v hlhp="$HLHP" 'BEGIN { exit !(ush < hlhp) }' && \
+    KPCT=`king_percent`
+
+    # ── MODO NORMAL: HP > 10% ──────────────────────────────────────────────
+    # Comportamento original sem dodge
+    if awk -v p="$KPCT" 'BEGIN { exit !(p > 10) }'; then
+
+      # Heal do jogador (mantido em modo normal)
+      if awk -v ush="$(cat HP)" -v hlhp="$HLHP" 'BEGIN { exit !(ush < hlhp) }' && \
          [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
          [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
-      (
-        run_curl "${URL}$(cat HEAL)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-      cat HP > FULL; date +%s > last_heal
-      sleep 0.3s
+        (
+          run_curl "${URL}$(cat HEAL)" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        cat HP > FULL; date +%s > last_heal
+        sleep 0.3s
 
-    elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
+      # Ataque com cooldown normal
+      elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
+        if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
+          # kingatk disponivel — prioridade maxima
+          (
+            run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+          ) </dev/null > /dev/null 2>&1 &
+          time_exit 17
+          cl_access
+          # Stone se rei com HP baixo
+          if awk -v ush="$(cat HP2)" 'BEGIN { exit !(ush < 25) }'; then
+            (
+              run_curl "${URL}$(cat STONE)" > "$TMP/SRC"
+            ) </dev/null > /dev/null 2>&1 &
+            time_exit 17
+            cl_access
+          fi
+        else
+          # Ataque random ou normal
+          if awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
+             ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
+             awk -v rhp="$RHP" -v enh="$(cat HP2)" 'BEGIN { exit !(rhp < enh) }' || \
+             awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
+             ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
+             grep -q -o "$(cat USER)" allies.txt; then
+            (
+              run_curl "${URL}$(cat ATKRND)" > "$TMP/SRC"
+            ) </dev/null > /dev/null 2>&1 &
+            time_exit 17
+            cl_access
+            date +%s > last_atk
+          fi
+          (
+            run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+          ) </dev/null > /dev/null 2>&1 &
+          time_exit 17
+          cl_access
+        fi
+        date +%s > last_atk
+
+      else
+        # Aguarda cooldown — apenas atualiza pagina
+        (
+          run_curl "${URL}/king" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        sleep 1s
+      fi
+
+    # ── MODO ESPERA: 1% < HP <= 10% ────────────────────────────────────────
+    # Para todos os ataques exceto kingatk — guarda o golpe para o fim
+    elif awk -v p="$KPCT" 'BEGIN { exit !(p > 1) }'; then
+      printf "King sniper — modo espera: %s%%\n" "$KPCT"
+
+      # Apenas kingatk e permitido nesse intervalo
       if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         (
           run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
-        if awk -v ush="$(cat HP2)" 'BEGIN { exit !(ush < 25) }'; then
+        date +%s > last_atk
+      else
+        # Sem kingatk — apenas atualiza e monitora HP
+        (
+          run_curl "${URL}/king" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        sleep 0.5s
+      fi
+
+    # ── MODO FINALIZACAO: HP <= 1% ─────────────────────────────────────────
+    # Modo agressivo — spam de ataques, sem delays, sem heal, sem dodge
+    else
+      printf "King sniper — FINALIZACAO: %s%%\n" "$KPCT"
+
+      # Sequencia de finalizacao: kingatk > stone > atk > atk > atk > repeat
+      if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
+        # 1. kingatk — prioridade absoluta
+        (
+          run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        # 2. stone imediatamente apos kingatk
+        if [ -s STONE ]; then
           (
             run_curl "${URL}$(cat STONE)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
         fi
-      else
-        if awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
-           ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-           awk -v rhp="$RHP" -v enh="$(cat HP2)" 'BEGIN { exit !(rhp < enh) }' || \
-           awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
-           ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-           grep -q -o "$(cat USER)" allies.txt; then
-          (
-            run_curl "${URL}$(cat ATKRND)" > "$TMP/SRC"
-          ) </dev/null > /dev/null 2>&1 &
-          time_exit 17
-          cl_access
-          date +%s > last_atk
-        fi
+      fi
+
+      # 3-5. Spam ataque normal — sem delay
+      (
+        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+      ) </dev/null > /dev/null 2>&1 &
+      time_exit 17
+      cl_access
+      (
+        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+      ) </dev/null > /dev/null 2>&1 &
+      time_exit 17
+      cl_access
+      (
+        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+      ) </dev/null > /dev/null 2>&1 &
+      time_exit 17
+      cl_access
+
+      # 6. kingatk novamente se disponivel
+      if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         (
-          run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+          run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
       fi
+
       date +%s > last_atk
-    else
-      (
-        run_curl "${URL}/king" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-      sleep 1s
     fi
+
   done
+
+  # ── POS-MORTE DO REI ───────────────────────────────────────────────────────
+  # Executa dodge UMA ÚNICA VEZ imediatamente apos o rei morrer
+  # Objetivo: garantir posicao para proxima rodada
+  if [ -s DODGE ]; then
+    printf "King morto — executando dodge pos-morte\n"
+    (
+      run_curl "${URL}$(cat DODGE)" > "$TMP/SRC"
+    ) </dev/null > /dev/null 2>&1 &
+    time_exit 17
+  fi
 
   unset cl_access
   func_unset
