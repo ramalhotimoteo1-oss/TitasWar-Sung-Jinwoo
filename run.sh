@@ -1,77 +1,155 @@
-twm_play() {
-    echo "$RUN" > "$TWMDIR/runmode_file"
+#!/bin/sh
+# shellcheck disable=SC1091
+# twm.sh - Worker de conta individual (nao interativo)
+# Executado pelo worker.sh com o shell correto via $TOYBOX
 
-    if [ ! -s "$TMP/CLD" ]; then
-        clan_id
+TOYBOX="${TOYBOX:-sh}"
+
+if [ -z "$TWMDIR" ]; then
+    _d=$(dirname "$0")
+    TWMDIR=$(cd "$_d" && pwd)
+    unset _d
+    export TWMDIR
+fi
+
+# Valida variaveis obrigatorias injetadas pelo play.sh via worker.sh
+if [ -z "$TWM_SRV" ] || [ -z "$TWM_URL" ] || [ -z "$TWM_ACC_DIR" ]; then
+    printf "ERRO: twm.sh deve ser chamado pelo worker.sh\n"
+    exit 1
+fi
+
+# Variaveis de ambiente da conta
+URL="$TWM_URL"
+UR="$TWM_SRV"
+TMP="$TWM_ACC_DIR"
+TMP_COOKIE="$TMP/cookie.txt"
+export URL UR TMP TMP_COOKIE
+
+case "$UR" in
+    1)  export TZ="America/Bahia" ;;
+    2)  export TZ="Europe/Berlin" ;;
+    3)  export TZ="America/Cancun" ;;
+    4)  export TZ="Europe/Paris" ;;
+    5)  export TZ="Asia/Kolkata" ;;
+    6)  export TZ="Asia/Jakarta" ;;
+    7)  export TZ="Europe/Rome" ;;
+    8)  export TZ="Europe/Warsaw" ;;
+    9)  export TZ="Europe/Bucharest" ;;
+    10) export TZ="Europe/Moscow" ;;
+    11) export TZ="Europe/Belgrade" ;;
+    12) export TZ="Asia/Shanghai" ;;
+    13) export TZ="Europe/London" ;;
+esac
+
+mkdir -p "$TMP"
+
+# Grava status imediatamente
+[ -n "$TWM_STATUS_FILE" ] && echo "loading" > "$TWM_STATUS_FILE"
+
+# Carrega modulos
+. "$TWMDIR/info.sh"
+. "$TWMDIR/session_check.sh"
+colors
+
+RUN=$(cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot')
+
+if [ -d /data/data/com.termux/files/usr/share/doc ]; then
+    termux-wake-lock 2>/dev/null
+fi
+
+cd "$TWMDIR" || exit 1
+for _lib in \
+    language.sh requeriments.sh loginlogoff.sh \
+    flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
+    campaign.sh run.sh altars.sh clandmg.sh clanfight.sh \
+    clancoliseum.sh king.sh undying.sh trade.sh career.sh \
+    cave.sh allies.sh svproxy.sh check.sh league.sh \
+    specialevent.sh function.sh update_check.sh
+do
+    [ -f "$TWMDIR/$_lib" ] && . "$TWMDIR/$_lib"
+done
+unset _lib
+
+type translate_and_cache > /dev/null 2>&1 || translate_and_cache() { echo "$2"; }
+
+language_setup
+load_config
+
+# userAgent
+if [ ! -f "$TMP/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ]; then
+    cp "$TWMDIR/userAgent.txt" "$TMP/userAgent.txt"
+fi
+random_ua 2>/dev/null
+[ -z "$vUserAgent" ] && vUserAgent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36"
+export vUserAgent
+
+# Arquivos de aliados
+[ ! -f "$TMP/allies.txt" ]  && : > "$TMP/allies.txt"
+[ ! -f "$TMP/callies.txt" ] && : > "$TMP/callies.txt"
+
+printf "[%s] %s — iniciando\n" "$TWM_TAG" "$TWM_USER"
+
+# Login com retry — delay crescente, nunca mata o worker
+do_login() {
+    cript_file="$TMP/cript_file"
+    [ ! -f "$cript_file" ] && printf "[%s] %s — ERRO: sem credenciais\n" "$TWM_TAG" "$TWM_USER" && return 1
+
+    creds=$(base64 -d "$cript_file" 2>/dev/null)
+    luser=$(echo "$creds" | sed 's/login=//;s/&pass=.*//')
+    lpass=$(echo "$creds" | sed 's/.*&pass=//')
+    unset creds
+
+    run_curl --data-urlencode "login=${luser}" \
+             --data-urlencode "pass=${lpass}" \
+             "${URL}/?sign_in=1" > /dev/null
+    run_curl --data-urlencode "login=${luser}" \
+             --data-urlencode "pass=${lpass}" \
+             "${URL}/?sign_in=1" > /dev/null
+    unset luser lpass
+
+    PAGE=$(run_curl "${URL}/user")
+    if is_logged_in "$PAGE"; then
+        ACC=$(extract_username "$PAGE")
+        [ -z "$ACC" ] && ACC="$TWM_USER"
+        export ACC
+        printf "[%s] %s — login OK\n" "$TWM_TAG" "$ACC"
+        return 0
     fi
+    return 1
+}
 
-    case `date +%H:%M` in
-        (00:[0-5]5|01:[0-5]5|02:[0-5]5|03:[0-5]5)
-            coliseum_fight
-            ;;
-        (00:00|00:30|01:00|01:30|02:00|02:30|03:00|03:30|04:00|04:30|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:30|12:00|13:00|13:30|14:30|15:30|17:00|17:30|18:00|18:30|19:30|20:00|20:30|23:00)
-            start
-            ;;
-        (23:30)
-            start
-            if [ "$FUNC_AUTO_UPDATE" = "y" ]; then
-                update
-            fi
-            ;;
-        (09:5[5-9]|15:5[5-9]|21:5[5-9])
-            undying_start
-            start
-            ;;
-        (10:1[0-4]|16:1[0-4])
-            flagfight_start
-            ;;
-        (10:2[8-9]|14:5[8-9])
-            if [ -n "$CLD" ]; then
-                clancoliseum_start
-            fi
-            start
-            ;;
-        (10:5[5-9]|18:5[5-9])
-            if [ -n "$CLD" ]; then
-                clanfight_start
-            fi
-            start
-            ;;
-        (12:2[5-9]|16:2[5-9]|22:2[5-9])
-            king_start
-            start
-            ;;
-        (13:5[5-9]|20:5[5-9])
-            if [ -n "$CLD" ]; then
-                altars_start
-            fi
-            start
-            ;;
-        (09:2[5-9]|21:2[5-9])
-            specialEvent
-            start
-            ;;
-        (*)
-            if echo "$RUN" | grep -q -E '[-]cl'; then
-                printf "Running in coliseum mode: %s\n" "$RUN"
-                sleep 5s
-                arena_duel
-                coliseum_start
-                messages_info
-            fi
-            func_sleep
-            func_crono
-            ;;
+login_delay=30
+while true; do
+    if do_login; then
+        break
+    fi
+    printf "[%s] %s — login falhou, tentando em %ss\n" \
+        "$TWM_TAG" "$TWM_USER" "$login_delay"
+    [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
+    sleep "$login_delay"
+    [ "$login_delay" -lt 300 ] && login_delay=$((login_delay * 2))
+    [ "$login_delay" -gt 300 ] && login_delay=300
+    rm -f "$TMP_COOKIE"
+done
+
+clan_id 2>/dev/null
+func_proxy
+
+twm_start() {
+    case "$RUN" in
+        *-cv*) cave_start ;;
+        *-cl*) twm_play ;;
+        *)     twm_play ;;
     esac
 }
 
-restart_script() {
-    # Mata apenas processos twm.sh desta conta (identificados pelo TMP exportado)
-    pidf=`pgrep -f "sh.*twm/twm.sh"`
-    while [ -n "$pidf" ]; do
-        kill -9 "$pidf" 2>/dev/null
-        sleep 1s
-        pidf=`pgrep -f "sh.*twm/twm.sh"`
-    done
-    nohup sh "$TWMDIR/twm.sh" "$RUN" >/dev/null 2>&1 &
+func_unset() {
+    unset HP1 HP2 YOU USER CLAN ENTER ATK ATKRND DODGE HEAL GRASS STONE BEXIT OUTGATE LEAVEFIGHT WDRED CAVE BREAK NEWCAVE
 }
+
+[ -n "$TWM_STATUS_FILE" ] && echo "running" > "$TWM_STATUS_FILE"
+printf "[%s] %s — loop principal iniciado\n" "$TWM_TAG" "$ACC"
+
+while true; do
+    twm_start
+done
