@@ -7,10 +7,13 @@ RED='\033[0;31m'
 CYAN='\033[01;36m'
 RESET='\033[00m'
 
-printf "${CYAN}=== TWM Toybox Installer ===${RESET}\n\n"                                                                                                          # Metodo 1: pkg install toybox
+printf "${CYAN}=== TWM Toybox Installer ===${RESET}\n\n"
+
+# Metodo 1: pkg install toybox
 printf "Tentando instalar via pkg...\n"
 if pkg install toybox -y 2>/dev/null; then
-    TOYBOX_BIN=$(which toybox 2>/dev/null)                if [ -n "$TOYBOX_BIN" ]; then
+    TOYBOX_BIN=$(which toybox 2>/dev/null)
+    if [ -n "$TOYBOX_BIN" ]; then
         printf "${GREEN}toybox instalado: %s${RESET}\n" "$TOYBOX_BIN"
     fi
 fi
