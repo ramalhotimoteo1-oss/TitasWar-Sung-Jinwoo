@@ -1,8 +1,13 @@
-#!/data/data/com.termux/files/home/.multcf/toybox bash
-# Fallback: se nao estiver rodando com toybox, reexecuta com ele
+#!/bin/sh
+# play.sh - Orquestrador multi-contas TWM
+# Shebang #!/bin/sh garante que o script SEMPRE executa
+# Toybox e detectado internamente para melhor desempenho
+
+# Detecta e usa toybox se disponivel
 TOYBOX="$HOME/.multcf/toybox"
-if [ -x "$TOYBOX" ] && [ -z "$_TOYBOX_RUNNING" ]; then
-    _TOYBOX_RUNNING=1 exec "$TOYBOX" bash "$0" "$@"   fi
+if [ ! -x "$TOYBOX" ]; then
+    TOYBOX="sh"
+fi
 export TOYBOX
 
 _dir=$(dirname "$0")
@@ -10,12 +15,13 @@ TWMDIR=$(cd "$_dir" && pwd)
 unset _dir
 export TWMDIR
 
-ACCOUNTS_FILE="$TWMDIR/accounts.conf"                 
-# Mantem o Termux acordado enquanto o monitor roda
+ACCOUNTS_FILE="$TWMDIR/accounts.conf"
+
 termux-wake-lock 2>/dev/null
 STATUS_DIR="$HOME/.twm/status"
 RUN="${1:--boot}"
-                                                      GREEN='\033[32m'
+
+GREEN='\033[32m'
 GOLD='\033[0;33m'
 RED='\033[0;31m'
 CYAN='\033[01;36m'
@@ -54,14 +60,20 @@ if [ ! -f "$ACCOUNTS_FILE" ] || [ ! -s "$ACCOUNTS_FILE" ]; then
     exit 1
 fi
 
-total=$(grep -cE '^[^#|]' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
-printf "${CYAN}TWM Multi-contas — %s conta(s) ${RESET}\n\n" "$total"
+# Conta apenas linhas com pipe (formato valido: srv|user|encoded)
+total=$(grep -c '|' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
+printf "${CYAN}TWM Multi-contas — %s conta(s) [%s]${RESET}\n\n" "$total" "$TOYBOX"
 
 n=0
 
-# Le accounts.conf via fd3 — nao redireciona stdin do shell principal
+# Usa fd3 para ler accounts.conf sem interferir no stdin
 while IFS='|' read -r srv user encoded <&3; do
-    case "$srv" in ''|\#*) continue ;; esac
+    # Pula linhas vazias e comentarios
+    case "$srv" in
+        ''|\#*) continue ;;
+    esac
+    # Pula linhas sem user ou encoded
+    [ -z "$user" ] || [ -z "$encoded" ] && continue
 
     n=$((n + 1))
     url=$(server_url "$srv")
@@ -81,39 +93,46 @@ while IFS='|' read -r srv user encoded <&3; do
 
     # Para worker anterior se ainda estiver rodando
     if [ -f "$pid_file" ]; then
-        old_pid=$(cat "$pid_file")
-        kill -0 "$old_pid" 2>/dev/null && kill -9 "$old_pid" 2>/dev/null
+        old_pid=$(cat "$pid_file" 2>/dev/null)
+        [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null && kill -9 "$old_pid" 2>/dev/null
+        rm -f "$pid_file"
     fi
 
     echo "starting" > "$status_file"
 
-    # Lanca worker completamente desanexado com toybox
-    TOYBOX="$TOYBOX" _TOYBOX_RUNNING="" \
-    nohup "$TOYBOX" bash "$TWMDIR/worker.sh" \
+    # Lanca worker desanexado
+    # TOYBOX passado explicitamente — worker nao precisa de exec/fallback
+    # _TOYBOX_RUNNING=1 evita que worker tente re-executar com toybox
+    TOYBOX="$TOYBOX" _TOYBOX_RUNNING="1" \
+    nohup "$TOYBOX" "$TWMDIR/worker.sh" \
         "$srv" "$user" "$encoded" "$tag" \
         "https://$url" "$acc_dir" "$status_file" "$RUN" \
         < /dev/null >> "$log_file" 2>&1 &
 
-    # Aguarda PID com retry — ate 10s
+    # Aguarda PID com retry ate 10s
     pid=""
     _w=0
-    while [ -z "$pid" ] && [ $_w -lt 10 ]; do
+    while [ -z "$pid" ] && [ "$_w" -lt 10 ]; do
         sleep 1
         pid=$(cat "$pid_file" 2>/dev/null)
         _w=$((_w + 1))
     done
     printf "   PID: %s | Log: %s\n" "${pid:-FALHOU}" "$log_file"
-    if [ -z "$pid" ]; then
-        printf "   AVISO: worker nao iniciou. Verifique %s\n" "$log_file"
-    fi
+    [ -z "$pid" ] && printf "   ${RED}AVISO: worker nao iniciou. Verifique %s${RESET}\n" "$log_file"
 
 done 3< "$ACCOUNTS_FILE"
 
-printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
-printf "Acompanhar conta:  ${CYAN}tail -f ~/.twm/BR_Sherman/twm.log${RESET}\n"
-printf "Parar tudo:        ${CYAN}./stop.sh${RESET}\n\n"
+if [ "$n" -eq 0 ]; then
+    printf "${RED}Nenhuma conta valida encontrada em accounts.conf${RESET}\n"
+    printf "Verifique o formato: srv|usuario|credencial_base64\n"
+    exit 1
+fi
 
-# Monitor de status
+printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
+printf "Log de conta:  ${CYAN}tail -f ~/.twm/BR_NomeConta/twm.log${RESET}\n"
+printf "Parar tudo:    ${CYAN}./stop.sh${RESET}\n\n"
+
+# Monitor — reabre accounts.conf a cada ciclo via fd3
 W="======================================"
 
 while true; do
@@ -126,6 +145,7 @@ while true; do
 
     while IFS='|' read -r srv user _enc <&3; do
         case "$srv" in ''|\#*) continue ;; esac
+        [ -z "$user" ] && continue
         tag=$(server_tag "$srv")
         acc_id="${tag}_${user}"
         status_file="$STATUS_DIR/${acc_id}.status"
@@ -156,7 +176,7 @@ while true; do
     printf "╚%s╝\n" "$W"
 
     _i=0
-    while [ $_i -lt 20 ]; do
+    while [ "$_i" -lt 20 ]; do
         sleep 1
         _i=$((_i + 1))
     done
