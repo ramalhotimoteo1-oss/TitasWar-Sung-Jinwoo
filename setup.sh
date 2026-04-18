@@ -1,8 +1,8 @@
 #!/bin/sh
 # setup.sh - Gerenciamento de contas do TWM Multi-contas
 
-_dir=`dirname "$0"`
-TWMDIR=`cd "$_dir" && pwd`
+_dir=$(dirname "$0")
+TWMDIR=$(cd "$_dir" && pwd)
 unset _dir
 
 ACCOUNTS_FILE="$TWMDIR/accounts.conf"
@@ -10,7 +10,6 @@ ACCOUNTS_FILE="$TWMDIR/accounts.conf"
 # Carrega funcoes de verificacao de sessao
 . "$TWMDIR/session_check.sh"
 
-# Cores
 GREEN='\033[32m'
 GOLD='\033[0;33m'
 RED='\033[0;31m'
@@ -19,18 +18,12 @@ RESET='\033[00m'
 
 server_url() {
     case "$1" in
-        1)  echo "furiadetitas.net" ;;
-        2)  echo "titanen.mobi" ;;
-        3)  echo "guerradetitanes.net" ;;
-        4)  echo "tiwar.fr" ;;
-        5)  echo "in.tiwar.net" ;;
-        6)  echo "tiwar-id.net" ;;
-        7)  echo "guerraditiani.net" ;;
-        8)  echo "tiwar.pl" ;;
-        9)  echo "tiwar.ro" ;;
-        10) echo "tiwar.ru" ;;
-        11) echo "rs.tiwar.net" ;;
-        12) echo "cn.tiwar.net" ;;
+        1)  echo "furiadetitas.net" ;;   2)  echo "titanen.mobi" ;;
+        3)  echo "guerradetitanes.net" ;; 4)  echo "tiwar.fr" ;;
+        5)  echo "in.tiwar.net" ;;        6)  echo "tiwar-id.net" ;;
+        7)  echo "guerraditiani.net" ;;   8)  echo "tiwar.pl" ;;
+        9)  echo "tiwar.ro" ;;            10) echo "tiwar.ru" ;;
+        11) echo "rs.tiwar.net" ;;        12) echo "cn.tiwar.net" ;;
         13) echo "tiwar.net" ;;
     esac
 }
@@ -51,7 +44,7 @@ show_menu() {
     printf "${CYAN}║     TWM Multi-contas — Setup         ║${RESET}\n"
     printf "${CYAN}╚══════════════════════════════════════╝${RESET}\n\n"
     n=0
-    [ -f "$ACCOUNTS_FILE" ] && n=`grep -c '' "$ACCOUNTS_FILE" 2>/dev/null || echo 0`
+    [ -f "$ACCOUNTS_FILE" ] && n=$(grep -c '|' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
     printf "Contas cadastradas: ${GOLD}%s${RESET}\n\n" "$n"
     printf "${GOLD}1)${RESET} Listar contas\n"
     printf "${GOLD}2)${RESET} Adicionar conta\n"
@@ -70,8 +63,9 @@ list_accounts() {
         n=1
         while IFS='|' read -r srv user _enc; do
             case "$srv" in ''|\#*) continue ;; esac
-            url=`server_url "$srv"`
-            tag=`server_tag "$srv"`
+            [ -z "$user" ] && continue
+            url=$(server_url "$srv")
+            tag=$(server_tag "$srv")
             printf "${GOLD}%d)${RESET} [%s] %-20s %s\n" "$n" "$tag" "$user" "$url"
             n=$((n + 1))
         done < "$ACCOUNTS_FILE"
@@ -103,8 +97,8 @@ add_account() {
         *) printf "${RED}Servidor invalido.${RESET}\n"; sleep 2; return ;;
     esac
 
-    url=`server_url "$srv"`
-    tag=`server_tag "$srv"`
+    url=$(server_url "$srv")
+    tag=$(server_tag "$srv")
 
     printf "Usuario (%s): " "$url"
     read -r user
@@ -126,19 +120,19 @@ add_account() {
     printf "Testando login em %s...\n" "$url"
 
     if test_login "https://$url" "$user" "$pass"; then
-        encoded=`printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0`
+        encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0)
         printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
         printf "${GREEN}[OK] Conta [%s] %s adicionada!${RESET}\n" "$tag" "$user"
     else
         printf "${RED}Login nao confirmado automaticamente.${RESET}\n"
         printf "Isso pode ocorrer por bloqueio de IP no teste.\n"
-        printf "Salvar a conta mesmo assim? (y/n): "
+        printf "Salvar mesmo assim? (y/n): "
         read -r force
         case "$force" in
             y|Y)
-                encoded=`printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0`
+                encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0)
                 printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
-                printf "${GOLD}Conta salva sem validacao de login.${RESET}\n"
+                printf "${GOLD}Conta salva sem validacao.${RESET}\n"
                 ;;
             *) printf "Conta nao salva.\n" ;;
         esac
@@ -157,7 +151,8 @@ remove_account() {
     n=1
     while IFS='|' read -r srv user _enc; do
         case "$srv" in ''|\#*) continue ;; esac
-        tag=`server_tag "$srv"`
+        [ -z "$user" ] && continue
+        tag=$(server_tag "$srv")
         printf "${GOLD}%d)${RESET} [%s] %s\n" "$n" "$tag" "$user"
         n=$((n + 1))
     done < "$ACCOUNTS_FILE"
@@ -166,22 +161,25 @@ remove_account() {
     read -r choice
     [ "$choice" = "0" ] || [ -z "$choice" ] && return
 
-    total=`grep -c '' "$ACCOUNTS_FILE"`
-    if ! echo "$choice" | grep -qE '^[0-9]+$' || \
-       [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
-        printf "${RED}Invalido.${RESET}\n"; sleep 2; return
-    fi
+    total=$(grep -c '|' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
+    case "$choice" in
+        *[!0-9]*) printf "${RED}Invalido.${RESET}\n"; sleep 2; return ;;
+    esac
+    [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ] && \
+        printf "${RED}Invalido.${RESET}\n" && sleep 2 && return
 
-    line=`sed -n "${choice}p" "$ACCOUNTS_FILE"`
-    srv=`echo "$line" | cut -d'|' -f1`
-    user=`echo "$line" | cut -d'|' -f2`
-    tag=`server_tag "$srv"`
+    # Extrai a linha escolhida (apenas linhas validas)
+    line=$(grep '|' "$ACCOUNTS_FILE" | sed -n "${choice}p")
+    srv=$(echo "$line" | cut -d'|' -f1)
+    user=$(echo "$line" | cut -d'|' -f2)
+    tag=$(server_tag "$srv")
 
     printf "Remover [%s] %s? (y/n): " "$tag" "$user"
     read -r confirm
     case "$confirm" in
         y|Y)
-            sed -i "${choice}d" "$ACCOUNTS_FILE"
+            grep -v "^${srv}|${user}|" "$ACCOUNTS_FILE" > "$ACCOUNTS_FILE.tmp" && \
+                mv "$ACCOUNTS_FILE.tmp" "$ACCOUNTS_FILE"
             printf "${GREEN}Removida.${RESET}\n"
             acc_dir="$HOME/.twm/${tag}_${user}"
             if [ -d "$acc_dir" ]; then
@@ -204,29 +202,29 @@ test_account() {
     n=1
     while IFS='|' read -r srv user _enc; do
         case "$srv" in ''|\#*) continue ;; esac
-        tag=`server_tag "$srv"`
+        [ -z "$user" ] && continue
+        tag=$(server_tag "$srv")
         printf "${GOLD}%d)${RESET} [%s] %s\n" "$n" "$tag" "$user"
         n=$((n + 1))
     done < "$ACCOUNTS_FILE"
 
     printf "\nNumero: "
     read -r choice
-    total=`grep -c '' "$ACCOUNTS_FILE"`
-    if ! echo "$choice" | grep -qE '^[0-9]+$' || \
-       [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ]; then
-        printf "${RED}Invalido.${RESET}\n"; sleep 2; return
-    fi
+    total=$(grep -c '|' "$ACCOUNTS_FILE" 2>/dev/null || echo 0)
+    case "$choice" in *[!0-9]*) printf "${RED}Invalido.${RESET}\n"; sleep 2; return ;; esac
+    [ "$choice" -lt 1 ] || [ "$choice" -gt "$total" ] && \
+        printf "${RED}Invalido.${RESET}\n" && sleep 2 && return
 
-    line=`sed -n "${choice}p" "$ACCOUNTS_FILE"`
-    srv=`echo "$line" | cut -d'|' -f1`
-    user=`echo "$line" | cut -d'|' -f2`
-    encoded=`echo "$line" | cut -d'|' -f3`
-    tag=`server_tag "$srv"`
-    url=`server_url "$srv"`
+    line=$(grep '|' "$ACCOUNTS_FILE" | sed -n "${choice}p")
+    srv=$(echo "$line" | cut -d'|' -f1)
+    user=$(echo "$line" | cut -d'|' -f2)
+    encoded=$(echo "$line" | cut -d'|' -f3)
+    tag=$(server_tag "$srv")
+    url=$(server_url "$srv")
 
-    creds=`echo "$encoded" | base64 -d 2>/dev/null`
-    luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
-    lpass=`echo "$creds" | sed 's/.*&pass=//'`
+    creds=$(echo "$encoded" | base64 -d 2>/dev/null)
+    luser=$(echo "$creds" | sed 's/login=//;s/&pass=.*//')
+    lpass=$(echo "$creds" | sed 's/.*&pass=//')
     unset creds
 
     printf "Testando [%s] %s...\n" "$tag" "$user"
