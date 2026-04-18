@@ -23,12 +23,6 @@ Bot multi-contas para [titanswar.net](https://titanswar.net) e todos os servidor
 
 ---
 
-## Sobre o Toybox
-
-O bot usa o [Toybox](https://landley.net/toybox/) como utilitário de sistema para garantir comandos consistentes em dispositivos Android antigos. Os scripts são executados pelo `sh` nativo do Termux — o Toybox serve como suporte de coreutils, não como interpretador.
-
----
-
 ## Instalação no Termux
 
 > Instale o Termux pela [F-Droid](https://f-droid.org/packages/com.termux/) — a versão da Play Store está desatualizada.
@@ -55,44 +49,7 @@ pkg install git curl wget jq -y
 
 ---
 
-### 3. Cria a pasta do Toybox
-
-Cria o diretório onde o binário do Toybox ficará armazenado.
-
-```bash
-mkdir -p ~/.multcf
-```
-
----
-
-### 4. Baixa o Toybox
-
-Detecta sua arquitetura e baixa o binário correto automaticamente.
-
-```bash
-ARCH=$(uname -m) && \
-case "$ARCH" in
-  aarch64) TB="toybox-aarch64" ;;
-  armv7l)  TB="toybox-armv7l"  ;;
-  armv5*)  TB="toybox-armv5l"  ;;
-  x86_64)  TB="toybox-x86_64"  ;;
-  i686)    TB="toybox-i686"    ;;
-  *)       TB="toybox-aarch64" ;;
-esac && \
-curl -L -o ~/.multcf/toybox "https://landley.net/toybox/bin/$TB"
-```
-
----
-
-### 5. Dá permissão de execução ao Toybox
-
-```bash
-chmod +x ~/.multcf/toybox
-```
-
----
-
-### 6. Baixa o bot
+### 3. Baixa o bot
 
 Clona o repositório na pasta atual do Termux.
 
@@ -102,7 +59,7 @@ git clone https://github.com/ramalhotimoteo1-oss/TitasWar-Sung-Jinwoo.git
 
 ---
 
-### 7. Entra na pasta do bot
+### 4. Entra na pasta do bot
 
 ```bash
 cd TitasWar-Sung-Jinwoo
@@ -110,7 +67,7 @@ cd TitasWar-Sung-Jinwoo
 
 ---
 
-### 8. Dá permissão de execução aos scripts principais
+### 5. Dá permissão de execução aos scripts
 
 ```bash
 chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
@@ -118,7 +75,7 @@ chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
 
 ---
 
-### 9. Cadastra as contas
+### 6. Cadastra as contas
 
 Abre o menu interativo para adicionar, listar ou remover contas. Cada conta é salva com as credenciais criptografadas em `accounts.conf`.
 
@@ -128,7 +85,7 @@ Abre o menu interativo para adicionar, listar ou remover contas. Cada conta é s
 
 ---
 
-### 10. Inicia o bot
+### 7. Inicia o bot
 
 Inicia todos os workers em paralelo e abre o monitor de status.
 
@@ -146,12 +103,23 @@ Modo padrão — roda todas as tarefas normalmente:
 ./play.sh
 ```
 
+Modo caverna — foca exclusivamente na caverna:
+
+```bash
+./play.sh -cv
+```
+
+Modo coliseu — prioriza o coliseu:
+
+```bash
+./play.sh -cl
+```
 
 ---
 
 ## Monitorar uma conta específica
 
-Exibe o log em tempo real de uma conta. Substitua `BR_NomeConta` pelo tag e nome corretos.
+Exibe o log em tempo real. Substitua `BR_NomeConta` pelo tag e nome da conta.
 
 ```bash
 tail -f ~/.twm/BR_NomeConta/twm.log
@@ -174,7 +142,7 @@ Para todos os workers de todas as contas.
 Remove todos os arquivos do bot e os dados gerados.
 
 ```bash
-cd ~ && rm -rf TitasWarPro-Mult-contas ~/.twm ~/.multcf
+cd ~ && rm -rf TitasWar-Sung-Jinwoo ~/.twm
 ```
 
 ---
