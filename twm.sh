@@ -47,8 +47,9 @@ colors
 
 RUN=`cat "$TWMDIR/runmode_file" 2>/dev/null || echo '-boot'`
 
-# Google Cloud SSH: sem termux-wake-lock necessario
-# O processo e mantido vivo pelo worker.sh + screen/tmux
+if [ -d /data/data/com.termux/files/usr/share/doc ]; then
+    termux-wake-lock 2>/dev/null
+fi
 
 cd "$TWMDIR" || exit 1
 for _lib in \
