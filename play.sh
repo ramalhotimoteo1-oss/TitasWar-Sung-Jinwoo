@@ -8,7 +8,7 @@ export TWMDIR
 
 ACCOUNTS_FILE="$TWMDIR/accounts.conf"
 
-# Google Cloud SSH: sem termux-wake-lock necessario
+termux-wake-lock 2>/dev/null
 STATUS_DIR="$HOME/.twm/status"
 RUN="${1:--boot}"
 
