@@ -25,6 +25,9 @@ PID_FILE="${TWM_STATUS_FILE%.status}.pid"
 echo "$$" > "$PID_FILE"
 echo "starting" > "$TWM_STATUS_FILE"
 
+# Evita Signal 9 por inatividade no Termux
+termux-wake-lock 2>/dev/null
+
 printf "[%s] %s — worker PID=%s iniciado\n" "$TWM_TAG" "$TWM_USER" "$$"
 
 # Prepara credencial
