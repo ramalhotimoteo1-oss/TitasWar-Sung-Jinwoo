@@ -42,3 +42,4 @@ done
 pkill -f "twm.sh" 2>/dev/null
 
 printf "\n${GREEN}%s worker(s) encerrado(s).${RESET}\n" "$stopped"
+termux-wake-unlock 2>/dev/null
