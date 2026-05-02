@@ -79,7 +79,7 @@ git clone https://github.com/ramalhotimoteo1-oss/TitasWar-Sung-Jinwoo.git
 **Passo 3** — Entra na pasta:
 
 ```bash
-cd ~/Wartank-Macro
+cd ~/TitasWar-Sung-Jinwoo
 ```
 
 ---
