@@ -68,7 +68,7 @@ cd ~
 **Passo 2** — Clona o repositório directamente como `Wartank-Macro`:
 
 ```bash
-git clone https://github.com/SEU_USER/SEU_REPO.git Wartank-Macro
+git clone https://github.com/ramalhotimoteo1-oss/TitasWar-Sung-Jinwoo.git
 ```
 
 > Substitui o URL pelo repositório real do bot.
